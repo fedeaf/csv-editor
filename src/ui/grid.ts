@@ -1,4 +1,5 @@
 import { clampWidth, columnAt, columnOffsets, fitWidth, longestStrings } from './columns'
+import { editorSpan } from './editorSpan'
 
 const ROW_HEIGHT = 26
 const HEADER_HEIGHT = 28
@@ -8,6 +9,10 @@ const EDITOR_LINE_HEIGHT = 18
 /** Vertical padding and border of the cell editor, to turn the height of its text into its own. */
 const EDITOR_PADDING = 6
 const EDITOR_BORDER = 4
+/** Border and padding on both sides of the editor, with a little slack against rounding and room for the caret. */
+const EDITOR_SIDES = 4 + 12 + 6
+/** How far from the scroll bar the editor stops. */
+const EDITOR_MARGIN = 6
 
 /** What the grid shows. Rows are display positions: filtered-out rows do not exist here. */
 export interface GridModel {
@@ -124,6 +129,7 @@ export class Grid {
   private selDrag: { mode: 'cells' | 'rows' | 'cols'; x: number; y: number; originX: number; originY: number; moved: boolean; frame: number } | null =
     null
   private fillHandle: HTMLElement
+  private measureContext: CanvasRenderingContext2D | undefined
   private fillPreview: HTMLElement
   private drag: {
     row: number
@@ -340,8 +346,6 @@ export class Grid {
     const original = model.cells(row)[col]!
     const input = this.createEditor(replace ? '' : original, true)
     input.style.top = `${row * ROW_HEIGHT}px`
-    input.style.left = `${this.colLeft(col)}px`
-    input.style.width = `${this.colWidth(col)}px`
     this.body.append(input)
     this.editing = { kind: 'cell', row, col, original, input }
     this.placeFillHandle()
@@ -370,22 +374,52 @@ export class Grid {
     input.setSelectionRange(caret, caret)
   }
 
+  /** Width of the longest line of a text, as the editor draws it, plus the room the editor itself takes around it. */
+  private editorNeeds(input: HTMLTextAreaElement): number {
+    this.measureContext ??= document.createElement('canvas').getContext('2d')!
+    const style = getComputedStyle(input)
+    this.measureContext.font = `${style.fontSize} ${style.fontFamily}`
+    let longest = 0
+    for (const line of input.value.split('\n')) longest = Math.max(longest, this.measureContext.measureText(line).width)
+    // Border and padding on both sides, a little slack against rounding, and room for the caret.
+    return longest + EDITOR_SIDES
+  }
+
   /**
-   * Sizes the editor of a cell to its text: one row while it fits on a line, otherwise as tall as the
-   * wrapped text needs, up to the room the table has (past that it scrolls inside). It grows downward
-   * from the cell, over the rows below, which stay where they are; the table is scrolled if the
-   * editor would run past its bottom.
+   * Sizes the editor of a cell to its text. Across: as wide as the column while the text fits it,
+   * otherwise it grows to the right, over the columns beside it, up to the edge of what is in view
+   * (or slides left when the cell is among the last columns); only if the text still does not fit
+   * does it wrap. Down: one row while it fits on a line, otherwise as tall as the wrapped text needs,
+   * up to the room the table has (past that it scrolls inside). It covers the rows below it, which
+   * stay where they are, and the table is scrolled if the editor would run past its bottom.
    */
   private fitEditor(input: HTMLTextAreaElement): void {
     const editing = this.editing
     if (editing?.kind !== 'cell') return
+    const s = this.scroller
+    const cellLeft = this.colLeft(editing.col)
+    const colWidth = this.colWidth(editing.col)
+    const span = editorSpan({
+      cellLeft,
+      colWidth,
+      needed: this.editorNeeds(input),
+      // From the row numbers, which a cell may touch, to a little before the scroll bar, though never
+      // short of the right edge of the cell itself.
+      viewLeft: s.scrollLeft + ROW_NUMBER_WIDTH,
+      viewRight: Math.max(s.scrollLeft + s.clientWidth - EDITOR_MARGIN, cellLeft + colWidth),
+    })
+    input.style.left = `${span.left}px`
+    input.style.width = `${span.width}px`
+    // Measured with no scroll bar: one would take width from the text and make a line that fits wrap.
+    input.style.overflowY = 'hidden'
     input.style.height = '0px' // so that scrollHeight is the height of the text alone
     const text = input.scrollHeight
     const room = Math.max(ROW_HEIGHT, this.scroller.clientHeight - HEADER_HEIGHT - 12)
     const wanted = text <= EDITOR_LINE_HEIGHT + EDITOR_PADDING ? ROW_HEIGHT : text + EDITOR_BORDER
     const height = Math.min(wanted, room)
     input.style.height = `${height}px`
-    const s = this.scroller
+    // A scroll bar only when the text is longer than the room there is; a line that fits needs none.
+    input.style.overflowY = wanted > room ? 'auto' : 'hidden'
     const overflow = editing.row * ROW_HEIGHT + height - (s.scrollTop + s.clientHeight - HEADER_HEIGHT)
     if (overflow > 0) s.scrollTop += overflow
   }
