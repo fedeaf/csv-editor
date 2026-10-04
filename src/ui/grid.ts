@@ -5,6 +5,9 @@ const HEADER_HEIGHT = 28
 const ROW_NUMBER_WIDTH = 72
 const BUFFER_ROWS = 10
 const EDITOR_LINE_HEIGHT = 18
+/** Vertical padding and border of the cell editor, to turn the height of its text into its own. */
+const EDITOR_PADDING = 6
+const EDITOR_BORDER = 4
 
 /** What the grid shows. Rows are display positions: filtered-out rows do not exist here. */
 export interface GridModel {
@@ -115,6 +118,8 @@ export class Grid {
   private extent: Pos | null = null
   private band: Band | null = null
   private editing: Editing | null = null
+  /** Set when a press landed on the only cell selected, in a table that already had the focus: a click, not a drag, edits it. */
+  private clickToEdit: Pos | null = null
   /** Selecting by dragging with the mouse; `moved` keeps a plain click from scrolling. */
   private selDrag: { mode: 'cells' | 'rows' | 'cols'; x: number; y: number; originX: number; originY: number; moved: boolean; frame: number } | null =
     null
@@ -333,7 +338,7 @@ export class Grid {
     const { row, col } = this.active
     this.ensureVisible(row, col)
     const original = model.cells(row)[col]!
-    const input = this.createEditor(replace ? '' : original)
+    const input = this.createEditor(replace ? '' : original, true)
     input.style.top = `${row * ROW_HEIGHT}px`
     input.style.left = `${this.colLeft(col)}px`
     input.style.width = `${this.colWidth(col)}px`
@@ -344,10 +349,14 @@ export class Grid {
     this.fitEditor(input)
   }
 
-  private createEditor(value: string): HTMLTextAreaElement {
+  /**
+   * A text field laid over a cell. For a cell it is `multiline`: long lines wrap and the field grows
+   * with its text, so everything in the cell can be seen and edited. A header name stays on one line.
+   */
+  private createEditor(value: string, multiline = false): HTMLTextAreaElement {
     const input = document.createElement('textarea')
-    input.className = 'cell-editor'
-    input.wrap = 'off'
+    input.className = multiline ? 'cell-editor multiline' : 'cell-editor'
+    input.wrap = multiline ? 'soft' : 'off'
     input.spellcheck = false
     input.value = value
     input.addEventListener('keydown', (e) => this.onEditorKeyDown(e))
@@ -361,11 +370,24 @@ export class Grid {
     input.setSelectionRange(caret, caret)
   }
 
-  /** Grows the editor with the number of lines (cells can hold line breaks). */
+  /**
+   * Sizes the editor of a cell to its text: one row while it fits on a line, otherwise as tall as the
+   * wrapped text needs, up to the room the table has (past that it scrolls inside). It grows downward
+   * from the cell, over the rows below, which stay where they are; the table is scrolled if the
+   * editor would run past its bottom.
+   */
   private fitEditor(input: HTMLTextAreaElement): void {
-    if (this.editing?.kind !== 'cell') return
-    const lines = input.value.split('\n').length
-    input.style.height = `${Math.max(ROW_HEIGHT, lines * EDITOR_LINE_HEIGHT + 8)}px`
+    const editing = this.editing
+    if (editing?.kind !== 'cell') return
+    input.style.height = '0px' // so that scrollHeight is the height of the text alone
+    const text = input.scrollHeight
+    const room = Math.max(ROW_HEIGHT, this.scroller.clientHeight - HEADER_HEIGHT - 12)
+    const wanted = text <= EDITOR_LINE_HEIGHT + EDITOR_PADDING ? ROW_HEIGHT : text + EDITOR_BORDER
+    const height = Math.min(wanted, room)
+    input.style.height = `${height}px`
+    const s = this.scroller
+    const overflow = editing.row * ROW_HEIGHT + height - (s.scrollTop + s.clientHeight - HEADER_HEIGHT)
+    if (overflow > 0) s.scrollTop += overflow
   }
 
   private finishEdit(commit: boolean): void {
@@ -554,6 +576,8 @@ export class Grid {
   private onMouseDown(e: MouseEvent): void {
     if (e.button !== 0 || e.target === this.editing?.input) return
     if (e.target === this.fillHandle) return this.startFill(e)
+    const hadFocus = document.activeElement === this.scroller
+    this.clickToEdit = null
     this.commitEdit()
     const resizer = (e.target as Element).closest<HTMLElement>('[data-role=resize]')
     if (resizer) return this.startResize(e, Number(resizer.closest<HTMLElement>('.header-cell')!.dataset.col))
@@ -562,6 +586,10 @@ export class Grid {
     if (!hit) return
     switch (hit.zone) {
       case 'cell':
+        // Pressing the cell that is already the whole selection, with no Shift, and when the table had the
+        // focus (so a click that only brings the focus back does not edit), is a click to edit if it is released
+        // without moving.
+        if (!e.shiftKey && hadFocus && this.isOnlySelected(hit.row, hit.col)) this.clickToEdit = { row: hit.row, col: hit.col }
         if (e.shiftKey) this.extendTo(hit.row, hit.col)
         else this.setActive(hit.row, hit.col)
         this.startSelectDrag('cells', e)
@@ -597,7 +625,9 @@ export class Grid {
     if (resizer) return this.fitColumn(Number(resizer.closest<HTMLElement>('.header-cell')!.dataset.col))
     if ((e.target as Element).closest('[data-role]')) return
     const hit = this.hit(e)
-    if (hit?.zone === 'cell') this.startCellEdit(false)
+    // The second click of a double click has already opened the editor.
+    const editingThis = this.editing?.kind === 'cell' && hit?.zone === 'cell' && this.editing.row === hit.row && this.editing.col === hit.col
+    if (hit?.zone === 'cell' && !editingThis) this.startCellEdit(false)
     else if (hit?.zone === 'header') this.startHeaderEdit(hit.col)
   }
 
@@ -993,6 +1023,16 @@ export class Grid {
     cancelAnimationFrame(d.frame)
     document.removeEventListener('mousemove', this.onSelectMove)
     document.removeEventListener('mouseup', this.onSelectEnd)
+    const armed = this.clickToEdit
+    this.clickToEdit = null
+    if (armed && d.mode === 'cells' && !d.moved && this.isOnlySelected(armed.row, armed.col)) this.startCellEdit(false)
+  }
+
+  /** True when the cell is the active one and nothing else is selected. */
+  private isOnlySelected(row: number, col: number): boolean {
+    const e = this.extent
+    const single = !this.band && (!e || (e.row === this.active.row && e.col === this.active.col))
+    return single && this.active.row === row && this.active.col === col
   }
 
   /** Each frame: scroll when the pointer is near an edge, then stretch the selection to the pointer. */

@@ -140,6 +140,8 @@ body { display: flex; flex-direction: column; background: var(--surface); }
 .row-number.active, .header-cell.active { background: var(--selection-header); color: var(--ink); }
 .header-cell.band { background: var(--selection-header-strong); }
 .cell-editor { position: absolute; z-index: 1; margin: 0; padding: 3px 8px; font: inherit; line-height: 18px; border: 2px solid var(--selection-edge); outline: none; resize: none; overflow: hidden; background: var(--surface); white-space: pre; user-select: text; box-shadow: var(--shadow-panel); }
+/* The editor of a cell wraps long lines and grows with its text; only past the room there is does it scroll. */
+.cell-editor.multiline { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
 
 /*
  * Header controls, left to right: duplicates, sort (an up arrow over a down arrow) and filter, with
