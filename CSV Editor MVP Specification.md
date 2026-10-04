@@ -286,6 +286,8 @@ The palette is defined once, as named values at the top of the stylesheet, and e
 | No duplicates | `#34a853` | The ✓ on a header |
 | Error | `#c5221f` | "No matches" in the search panel |
 
+The same names have a second set of values for a dark theme, used when the system asks for one (`prefers-color-scheme: dark`). The accent turns lighter and the text on it dark; every pair of text and background keeps at least the contrast WCAG asks for (4.5:1), which a test checks for both themes. There is no switch in the page: it follows the system.
+
 Selection style: the cells of a block are tinted and the block is outlined along its outer edge. The active cell, where typing goes, is white with its own outline. The row numbers and headers the block covers are shaded, and a whole selected column has a darker header.
 
 ## Beyond the original scope
@@ -302,6 +304,7 @@ Added after the MVP was specified:
 - **Start screen.** With no file open, the window shows an Open button and a note that files can be dropped anywhere in it.
 - **In-page dialogs** instead of the browser's own alert and confirm, for closing a tab with unsaved changes, for saving as UTF-8 when a character does not fit the file's encoding, and for errors. They name what each button does, start on Cancel when the action discards something, and keep keys and shortcuts from reaching the table underneath.
 - **A status bar in two parts.** On the left, the size of the selection, or for four seconds the result of the last action (saved, copied, pasted); a new selection replaces the message. On the right, the file's rows, columns, encoding and delimiter, and "Showing X of Y rows" under a filter.
+- **Dark theme**, following the system setting.
 - **Resizable columns.** Drag the edge of a header to resize a column, between 120 and 1200 pixels; double-click it to fit the content. The minimum leaves room for the header's controls. Widths belong to the view: they are kept per tab, are not part of the history and are not saved in the file.
 
 ## Verification
