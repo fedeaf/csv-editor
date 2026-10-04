@@ -112,7 +112,7 @@ body { display: flex; flex-direction: column; background: var(--surface); }
 .popup-menu li.disabled { color: var(--ink-disabled); cursor: default; background: none; }
 .popup-menu kbd { font: inherit; color: var(--ink-subtle); }
 .popup-menu .separator { padding: 0; margin: 4px 0; height: 1px; background: var(--line); cursor: default; }
-.context-menu { position: fixed; z-index: 30; min-width: 170px; }
+.context-menu { position: fixed; z-index: 30; min-width: 190px; max-height: calc(100vh - 8px); overflow-y: auto; }
 
 /* The switch of a menu entry that turns something on and off */
 .switch { position: relative; flex: none; width: 28px; height: 16px; margin-top: 1px; border-radius: 8px; background: var(--chrome-hover); transition: background 0.15s; }

@@ -69,7 +69,7 @@ export interface GridHandlers {
   onCellEdit(row: number, col: number, value: string): void
   onHeaderEdit(col: number, value: string): void
   /** The grid has already selected what was clicked. */
-  onContextMenu(kind: 'rows' | 'cols' | 'corner', clientX: number, clientY: number): void
+  onContextMenu(kind: 'rows' | 'cols' | 'corner' | 'cell', clientX: number, clientY: number): void
 }
 
 /** Whole rows or whole columns selected by their number or header; `end` is the moving side. */
@@ -615,6 +615,7 @@ export class Grid {
   }
 
   private onContextMenu(e: MouseEvent): void {
+    if (e.target === this.editing?.input) return // the text being edited keeps the browser's own menu
     const hit = this.hit(e)
     if (!hit) return
     if (hit.zone === 'rowNumber') {
@@ -630,6 +631,15 @@ export class Grid {
     } else if (hit.zone === 'corner') {
       e.preventDefault()
       this.handlers.onContextMenu('corner', e.clientX, e.clientY)
+    } else if (hit.zone === 'cell') {
+      // A cell inside the selection keeps it, so the menu acts on all of it; any other cell becomes the selection.
+      this.commitEdit()
+      const { r0, r1, c0, c1 } = this.selection()
+      const inside = hit.row >= r0 && hit.row <= r1 && hit.col >= c0 && hit.col <= c1
+      if (!inside) this.setActive(hit.row, hit.col)
+      this.focus()
+      e.preventDefault()
+      this.handlers.onContextMenu('cell', e.clientX, e.clientY)
     }
   }
 

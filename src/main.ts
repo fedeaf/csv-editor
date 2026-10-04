@@ -6,7 +6,7 @@ import { History, type Outcome } from './model/history'
 import { nextErrorRow } from './model/errors'
 import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, type Position, type SearchGrid } from './model/search'
 import { TableView, uniqueValues, type ColumnFilter } from './model/view'
-import { closeContextMenu, showContextMenu } from './ui/contextMenu'
+import { closeContextMenu, showContextMenu, type MenuItem } from './ui/contextMenu'
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
 import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
 import { Grid, type FillRequest, type GridModel, type GridState, type Rect } from './ui/grid'
@@ -308,37 +308,79 @@ function clearCells(rect: Rect): void {
 const isTextField = (target: EventTarget | null) =>
   target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
 
-/** Copies what is shown in the selection (rows hidden by a filter are left out) as text spreadsheets understand. */
-function copySelection(e: ClipboardEvent, cut: boolean): void {
-  const tab = current
-  if (!tab || isDialogOpen() || grid.isEditing || isTextField(e.target) || !e.clipboardData) return
+/** What the selection holds as text spreadsheets understand. Rows hidden by a filter are left out. */
+function selectionText(tab: Tab): { text: string; size: string; rect: Rect } | undefined {
   const rect = grid.selection()
   const rows: string[][] = []
   for (let r = rect.r0; r <= rect.r1; r++) {
     const rowId = tab.view.idAt(r)
     if (rowId !== undefined) rows.push(tab.doc.table.rowById(rowId)!.cells.slice(rect.c0, rect.c1 + 1))
   }
-  if (rows.length === 0) return
-  e.clipboardData.setData('text/plain', toTsv(rows))
-  e.preventDefault()
-  const size = `${plural(rows.length, 'row')} × ${plural(rect.c1 - rect.c0 + 1, 'column')}`
+  if (rows.length === 0) return undefined
+  return { text: toTsv(rows), size: `${plural(rows.length, 'row')} × ${plural(rect.c1 - rect.c0 + 1, 'column')}`, rect }
+}
+
+/** After the text is on the clipboard: a cut empties what was taken, and the status bar says what happened. */
+function copied({ rect, size }: { rect: Rect; size: string }, cut: boolean): void {
   if (cut) clearCells(rect)
   showMeta(`${cut ? 'Cut' : 'Copied'} ${size}`)
+}
+
+/** Ctrl+C and Ctrl+X, through the browser's clipboard events. */
+function copySelection(e: ClipboardEvent, cut: boolean): void {
+  const tab = current
+  if (!tab || isDialogOpen() || grid.isEditing || isTextField(e.target) || !e.clipboardData) return
+  const selection = selectionText(tab)
+  if (!selection) return
+  e.clipboardData.setData('text/plain', selection.text)
+  e.preventDefault()
+  copied(selection, cut)
+}
+
+/** Cut and Copy from the context menu, which has no clipboard event to work with. */
+async function copyFromMenu(cut: boolean): Promise<void> {
+  const selection = current && selectionText(current)
+  if (!selection) return
+  try {
+    await navigator.clipboard.writeText(selection.text)
+  } catch {
+    report(new Error('The browser did not let the page write to the clipboard.'), cut ? 'Could not cut' : 'Could not copy')
+    return
+  }
+  copied(selection, cut)
+}
+
+/** Paste from the context menu. The browser asks for permission to read the clipboard the first time. */
+async function pasteFromMenu(): Promise<void> {
+  let text: string
+  try {
+    text = await navigator.clipboard.readText()
+  } catch {
+    report(new Error('The browser did not let the page read the clipboard. You can paste with Ctrl+V instead.'), 'Could not paste')
+    return
+  }
+  pasteText(text)
+}
+
+/** Ctrl+V, through the browser's clipboard event. */
+function pasteClipboard(e: ClipboardEvent): void {
+  const text = e.clipboardData?.getData('text/plain')
+  if (!current || isDialogOpen() || grid.isEditing || isTextField(e.target) || !text) return
+  if (pasteText(text)) e.preventDefault()
 }
 
 /**
  * Pastes at the top-left of the selection, one clipboard row per row shown. A single value pasted
  * over several selected cells fills them all. Lines that do not fit become new rows at the end of the
- * table and extra columns are added, so nothing is dropped; it is all one undo step.
+ * table and extra columns are added, so nothing is dropped; it is all one undo step. Returns false
+ * when there was nothing to paste.
  */
-function pasteClipboard(e: ClipboardEvent): void {
+function pasteText(text: string): boolean {
   const tab = current
-  const text = e.clipboardData?.getData('text/plain')
-  if (!tab || isDialogOpen() || grid.isEditing || isTextField(e.target) || !text) return
+  if (!tab) return false
   const block = squared(parseTsv(text))
   const table = tab.doc.table
-  if (block.length === 0 || table.columnCount === 0) return
-  e.preventDefault()
+  if (block.length === 0 || table.columnCount === 0) return false
   const rect = grid.selection()
   const height = block.length
   const width = block[0]!.length
@@ -349,12 +391,12 @@ function pasteClipboard(e: ClipboardEvent): void {
     const command = fillCells(table, cellsIn(tab, rect), block[0]![0]!)
     if (command) run(command)
     showMeta(`Pasted into ${plural((rect.r1 - rect.r0 + 1) * (rect.c1 - rect.c0 + 1), 'cell')}`)
-    return
+    return true
   }
   const command = pasteCells(table, tab.view.visible.slice(rect.r0, rect.r0 + height), rect.c0, block)
   if (!command) {
     showMeta('Nothing changed', true)
-    return
+    return true
   }
   run(command)
   grid.selectRange(rect.r0, rect.c0, rect.r0 + height - 1, rect.c0 + width - 1)
@@ -363,6 +405,7 @@ function pasteClipboard(e: ClipboardEvent): void {
     table.columnCount > colsBefore ? plural(table.columnCount - colsBefore, 'column') : '',
   ].filter(Boolean)
   showMeta(`Pasted ${plural(height, 'row')} × ${plural(width, 'column')}${added.length ? ` (added ${added.join(' and ')})` : ''}`)
+  return true
 }
 
 document.addEventListener('copy', (e) => copySelection(e, false))
@@ -648,11 +691,38 @@ menuList.addEventListener('click', (e) => {
   Promise.resolve(actions[item.dataset.action!]!()).catch(report).finally(() => grid.focus())
 })
 
-/** Insert and delete live in the context menu of row numbers and column headers (D-09). */
-function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner') {
+/**
+ * Insert and delete live in the context menu of row numbers and column headers (D-09), and the menu of
+ * a cell has them too, together with cut, copy, paste and clear. They all act on what is selected.
+ */
+function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): MenuItem[] {
   const table = tab.doc.table
   const v = tab.view
   if (kind === 'corner') return [{ label: 'Insert row at top', run: () => run(insertRows(table, 0, 1)) }]
+  if (kind === 'cell') {
+    const rect = grid.selection()
+    const ids = v.visible.slice(rect.r0, rect.r1 + 1)
+    const cols = rect.c1 - rect.c0 + 1
+    return [
+      { label: 'Cut', hint: 'Ctrl+X', run: () => void copyFromMenu(true) },
+      { label: 'Copy', hint: 'Ctrl+C', run: () => void copyFromMenu(false) },
+      { label: 'Paste', hint: 'Ctrl+V', run: () => void pasteFromMenu() },
+      { separator: true },
+      { label: 'Clear contents', hint: 'Delete', run: () => clearCells(rect) },
+      { separator: true },
+      { label: 'Insert row above', run: () => run(insertRows(table, table.indexOfRow(ids[0]!), 1)) },
+      { label: 'Insert row below', run: () => run(insertRows(table, table.indexOfRow(ids[ids.length - 1]!) + 1, 1)) },
+      { label: ids.length > 1 ? `Delete ${ids.length} rows` : 'Delete row', run: () => run(deleteRows(ids)) },
+      { separator: true },
+      { label: 'Insert column left', run: () => run(insertColumn(table, rect.c0)) },
+      { label: 'Insert column right', run: () => run(insertColumn(table, rect.c1 + 1)) },
+      {
+        label: cols > 1 ? `Delete ${cols} columns` : 'Delete column',
+        run: () => run(deleteColumns(rect.c0, rect.c1)),
+        disabled: cols >= table.columnCount, // a table keeps at least one column
+      },
+    ]
+  }
   if (kind === 'rows') {
     // Rows are chosen among the visible ones; a new row goes next to its neighbour in the whole table.
     const [from, to] = grid.selectedRows()

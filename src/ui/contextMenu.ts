@@ -1,8 +1,12 @@
-export interface MenuItem {
-  label: string
-  run: () => void
-  disabled?: boolean
-}
+export type MenuItem =
+  | {
+      label: string
+      run: () => void
+      disabled?: boolean
+      /** The shortcut that does the same, shown at the right. */
+      hint?: string
+    }
+  | { separator: true }
 
 let current: HTMLElement | undefined
 
@@ -17,10 +21,19 @@ export function showContextMenu(x: number, y: number, items: MenuItem[]): void {
   const menu = document.createElement('ul')
   menu.className = 'popup-menu context-menu'
   menu.setAttribute('role', 'menu')
+  // Pressing an entry must not take the focus away from the table the menu was opened on.
+  menu.addEventListener('mousedown', (e) => e.preventDefault())
   for (const item of items) {
     const li = document.createElement('li')
+    if ('separator' in item) {
+      li.setAttribute('role', 'separator')
+      li.className = 'separator'
+      menu.append(li)
+      continue
+    }
     li.setAttribute('role', 'menuitem')
-    li.textContent = item.label
+    li.append(item.label)
+    if (item.hint) li.append(Object.assign(document.createElement('kbd'), { textContent: item.hint }))
     if (item.disabled) li.classList.add('disabled')
     else
       li.addEventListener('click', () => {
