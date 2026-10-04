@@ -803,8 +803,16 @@ export class Grid {
     node.firstElementChild!.classList.toggle('active', inRows)
     const cells = node.children
     for (let c = 1; c < cells.length; c++) {
-      cells[c]!.classList.toggle('active', index === this.active.row && c - 1 === this.active.col)
-      cells[c]!.classList.toggle('selected', block && inRows && c - 1 >= c0 && c - 1 <= c1)
+      const col = c - 1
+      const inBlock = block && inRows && col >= c0 && col <= c1
+      const classes = cells[c]!.classList
+      classes.toggle('active', index === this.active.row && col === this.active.col)
+      classes.toggle('selected', inBlock)
+      // The outline of the block goes on the cells along its edges.
+      classes.toggle('sel-t', inBlock && index === r0)
+      classes.toggle('sel-b', inBlock && index === r1)
+      classes.toggle('sel-l', inBlock && col === c0)
+      classes.toggle('sel-r', inBlock && col === c1)
     }
   }
 

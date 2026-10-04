@@ -18,9 +18,13 @@ A web-based CSV editor with a spreadsheet-style interface, where every value is 
 
 Guiding principle: no operation may misalign the values of a row. Sorting, filtering and searching always act on whole rows.
 
+## Status
+
+All seven milestones are done and every acceptance criterion below is ticked. The nine decisions are closed (see Decisions). The palette and the selection style were defined in H7 (see Design). Several features were added after the original scope; they are listed in Beyond the original scope.
+
 ## Functional requirements
 
-Each requirement has an ID for referencing in tickets and milestones. Items marked as assumptions point to the open decisions section (D-xx) and must be confirmed before the related milestone.
+Each requirement has an ID for referencing in tickets and milestones. Items marked as assumptions point to a decision (D-xx); all of them are closed in the Decisions section.
 
 ### File (ARC)
 
@@ -112,29 +116,29 @@ The MVP explicitly leaves out the following; none of it should block delivery.
 | --- | --- |
 | Manual encoding selection when opening | Phase 2 |
 | Match counter such as "3 of 12" in search | Implementation detail, optional |
-| Previous match with Shift+Ctrl+G | Implementation detail, optional |
+| Previous match with Shift+Ctrl+G | Done (Shift+Ctrl+G, and Shift+Enter in the search field) |
 | Formats other than CSV (xlsx, json, tsv) | Out of scope |
 | Data types, formulas and arithmetic operations | Out of scope |
 | Mobile, tablet and browsers other than Chrome | Out of scope |
 | Maximum file size | Not defined |
 | Exhaustive test suite and edge cases | After the MVP |
-| Color palette and selection highlight style | Implementation decision |
+| Color palette and selection highlight style | Decided in H7 (see Design) |
 
-## Assumptions and open decisions
+## Decisions
 
-Nine points were not defined during the scoping conversation; D-04 is now decided and eight remain open. Each has a default proposal that development can apply unless someone changes it before the listed milestone.
+Nine points were not defined during the scoping conversation. All are now closed; each row says what the editor does. Where the decision was the default proposal, the alternative that was not taken is noted.
 
-| ID | Question | Default proposal | Before |
+| ID | Question | Decision | Closed in |
 | --- | --- | --- | --- |
-| D-01 | Is the first row always the header? | Yes, always. A file without a header would show its first data row as column names. | H1 |
-| D-02 | Which delimiters are supported? | Automatic detection between comma and semicolon.  | H1 |
-| D-03 | Which encoding is used on save? | The original one. If the user types a character that encoding cannot represent (for example an emoji in Windows-1252), warn and offer to save as UTF-8. | H1 |
-| D-04 | Which sort order is used? | Decided: alphabetical using English collation, case-insensitive, blank cells last. Since everything is text, "10" sorts before "9". | H3 |
-| D-05 | What counts as a duplicate? | Exact equality: case- and whitespace-sensitive. Blank cells do not count as duplicates. Alternative: ignore case and leading or trailing spaces, which is more useful for spotting inconsistencies. | H4 |
+| D-01 | Is the first row always the header? | Yes, always. A row with more cells than the header adds columns with a blank header, so no data is lost, and the user is warned. A row with fewer cells is padded with blanks, also with a warning. | H1 |
+| D-02 | Which delimiters are supported? | Comma and semicolon, detected automatically: the one that gives the most consistent rows of two or more columns, comma on a tie. | H1 |
+| D-03 | Which encoding is used on save? | The original one, with its BOM. If an edit adds a character that encoding cannot represent (for example an emoji in Windows-1252), the editor asks whether to save as UTF-8. If the user declines, nothing is written. Windows-1252 and ISO-8859-1 cannot be told apart and are one encoding. | H1 |
+| D-04 | Which sort order is used? | Alphabetical using English collation, case-insensitive, blank cells last, in ascending and descending order. Accents still count, so "é" and "e" are different letters, but "A" and "a" are equal and keep their original order. Since everything is text, "10" sorts before "9". | H3 |
+| D-05 | What counts as a duplicate? | Exact equality, case- and whitespace-sensitive. Blank cells never count. Duplicates are always measured over the whole column, whatever other filters are active. Not taken: ignoring case and surrounding spaces. | H4 |
 | D-06 | What is saved with active filters or a sort applied? | All rows, in the current order. Filters are view-only and are not part of undo. | H1 and H4 |
-| D-07 | In which order does search traverse cells? | Row by row, left to right, starting from the first visible row. Alternative: start from the selected cell, as Excel does. | H5 |
-| D-08 | Does fill affect rows hidden by a filter? | No, visible rows only. | H6 |
-| D-09 | Where do inserting and deleting rows and columns live? | Right-click context menu on row numbers and column headers. | H2 |
+| D-07 | In which order does search traverse cells? | Row by row, left to right, over the rows shown. A new search starts at the first visible row; Next continues from the last match and wraps around. Not taken: starting from the selected cell. | H5 |
+| D-08 | Does fill affect rows hidden by a filter? | No, visible rows only. The same rule applies to paste and to Delete over a selection. | H6 |
+| D-09 | Where do inserting and deleting rows and columns live? | Right-click context menu on row numbers and column headers. The top-left corner offers "Insert row at top", for a table that has no rows to click. | H2 |
 
 ## Technical notes
 
@@ -167,6 +171,7 @@ In Chrome, the labels "iso-8859-1", "latin1" and "ascii" are synonyms for Window
 - Each row has a stable internal identifier that is never written to the file. Table order is a list of those identifiers.
 - Sorting reorders the list of identifiers, never the values of a single column. This makes ORD-02 hold by design.
 - Filters are a derived view: the set of visible rows is recomputed while the data stays unchanged.
+- Columns have stable ids as well, so filters and the sort indicator stay on the same column when others are inserted or deleted.
 - History is implemented as a list of commands with do and undo. Every data-changing operation is defined as a command from milestone H2 onward.
 
 ### Performance
@@ -175,7 +180,7 @@ There is no defined size limit, but rendering every cell in the DOM degrades the
 
 ### Keyboard shortcuts
 
-Ctrl+F, Ctrl+G and Ctrl+S have built-in behavior in Chrome. The app must intercept them while it has focus. Whether Chrome allows overriding all three is \[Unverified\]; check it at the start of H5.
+Ctrl+F, Ctrl+G and Ctrl+S have built-in behavior in Chrome. The app intercepts them while it has focus. Verified in Chrome: all three can be overridden.
 
 ## Implementation milestones
 
@@ -199,71 +204,108 @@ H1 is highlighted because opening and saving without corrupting data is the bigg
 
 Acceptance criteria:
 
-- [ ] Files in UTF-8 with and without BOM, ASCII and Windows-1252 display accented letters and ñ correctly.
-- [ ] Opening, saving without edits and reopening produces the same table, cell by cell.
-- [ ] Fields with quotes, delimiters and embedded line breaks appear in a single cell.
-- [ ] A semicolon-delimited file opens correctly (D-02).
-- [ ] Save writes over the original file and Save As creates a new one.
-- [ ] The grid is virtualized and scrolling does not stall with the largest test file the team chooses.
+- [x] Files in UTF-8 with and without BOM, ASCII and Windows-1252 display accented letters and ñ correctly.
+- [x] Opening, saving without edits and reopening produces the same table, cell by cell.
+- [x] Fields with quotes, delimiters and embedded line breaks appear in a single cell.
+- [x] A semicolon-delimited file opens correctly (D-02).
+- [x] Save writes over the original file and Save As creates a new one.
+- [x] The grid is virtualized and scrolling does not stall with the largest test file the team chooses.
 
 ### H2 Editing and history
 
 Acceptance criteria:
 
-- [ ] Editing works by double-click, F2 or typing. Enter commits and moves down, Tab commits and moves right, Escape cancels.
-- [ ] Rows and columns can be inserted and deleted, and headers renamed.
-- [ ] Every change can be undone and redone with Ctrl+Z and Ctrl+Y and from the menu.
-- [ ] The asterisk appears with the first change and disappears on save.
-- [ ] Closing or reloading the tab with unsaved changes shows the browser warning.
+- [x] Editing works by double-click, F2 or typing. Enter commits and moves down, Tab commits and moves right, Escape cancels.
+- [x] Rows and columns can be inserted and deleted, and headers renamed.
+- [x] Every change can be undone and redone with Ctrl+Z and Ctrl+Y and from the menu.
+- [x] The asterisk appears with the first change and disappears on save.
+- [x] Closing or reloading the tab with unsaved changes shows the browser warning.
 
 ### H3 Sort
 
 Acceptance criteria:
 
-- [ ] The arrows sort the table and every cell of each row stays together, verified with a control row.
-- [ ] Rows with equal values keep their relative order.
-- [ ] The active column and direction are visible.
-- [ ] Undo restores the previous order.
-- [ ] Saving writes rows in the current order.
+- [x] The arrows sort the table and every cell of each row stays together, verified with a control row.
+- [x] Rows with equal values keep their relative order.
+- [x] The active column and direction are visible.
+- [x] Undo restores the previous order.
+- [x] Saving writes rows in the current order.
 
 ### H4 AutoFilter and duplicates
 
 Acceptance criteria:
 
-- [ ] The dropdown lists the column's unique values, including "(Blanks)".
-- [ ] Filters on two columns combine correctly.
-- [ ] "Duplicates only" shows only rows whose value repeats in that column.
-- [ ] Filtered columns are visually marked and clearing the filter restores all rows.
-- [ ] Saving with an active filter writes all rows.
-- [ ] If an edited cell no longer matches the filter, its row stays visible until the filter is reapplied, as in Excel (assumption).
+- [x] The dropdown lists the column's unique values, including "(Blanks)".
+- [x] Filters on two columns combine correctly.
+- [x] "Duplicates only" shows only rows whose value repeats in that column.
+- [x] Filtered columns are visually marked and clearing the filter restores all rows.
+- [x] Saving with an active filter writes all rows.
+- [x] If an edited cell no longer matches the filter, its row stays visible until the filter is reapplied, as in Excel (assumption).
 
 ### H5 Global search
 
 Acceptance criteria:
 
-- [ ] Ctrl+F and the menu open the panel with focus in the search field.
-- [ ] Searching jumps to the first match, selects it and scrolls the grid to it.
-- [ ] "Next" and Ctrl+G advance, and after the last match they wrap to the first.
-- [ ] Searching "ana" finds "Mariana" and "ANA". With the exact match flag it only finds cells whose whole value is "ana", case-insensitive.
-- [ ] Rows hidden by a filter are skipped.
-- [ ] With no matches, the panel says so.
+- [x] Ctrl+F and the menu open the panel with focus in the search field.
+- [x] Searching jumps to the first match, selects it and scrolls the grid to it.
+- [x] "Next" and Ctrl+G advance, and after the last match they wrap to the first.
+- [x] Searching "ana" finds "Mariana" and "ANA". With the exact match flag it only finds cells whose whole value is "ana", case-insensitive.
+- [x] Rows hidden by a filter are skipped.
+- [x] With no matches, the panel says so.
 
 ### H6 Drag-copy and fill
 
 Acceptance criteria:
 
-- [ ] Dragging the fill handle copies the value into the covered cells, horizontally or vertically.
-- [ ] Double-clicking the fill handle copies the value down to the last row, including in an empty column.
-- [ ] With an active filter, only visible rows change (D-08).
-- [ ] A single Ctrl+Z undoes the whole fill.
+- [x] Dragging the fill handle copies the value into the covered cells, horizontally or vertically.
+- [x] Double-clicking the fill handle copies the value down to the last row, including in an empty column.
+- [x] With an active filter, only visible rows change (D-08).
+- [x] A single Ctrl+Z undoes the whole fill.
 
 ### H7 MVP wrap-up
 
 Acceptance criteria:
 
-- [ ] Cross-feature test: filter, sort, search, fill, undo some of the changes and save. The reopened file contains exactly what is expected.
-- [ ] Color palette and selection highlight defined and applied across the interface.
-- [ ] Decisions D-01 to D-09 closed and reflected in this document.
+- [x] Cross-feature test: filter, sort, search, fill, undo some of the changes and save. The reopened file contains exactly what is expected.
+- [x] Color palette and selection highlight defined and applied across the interface.
+- [x] Decisions D-01 to D-09 closed and reflected in this document.
+
+## Design
+
+The palette is defined once, as named values at the top of the stylesheet, and every colour in the interface comes from those names. It is one accent blue on a cool-grey scale, plus a few colours that only carry meaning.
+
+| Role | Colour | Used for |
+| --- | --- | --- |
+| Accent | `#1a73e8` | Active cell outline, the outline of a selected block, fill handle, OK button, links |
+| Selection fill | `#dce8fc` | The cells of a selected block |
+| Selection header | `#dde3ea` | Row numbers and headers of the selected rows and columns |
+| Chrome | `#f1f3f4` | Toolbar, headers, row numbers, status bar |
+| Lines | `#d4d4d4`, `#ececec` | Borders, grid lines |
+| Text | `#202124`, `#5f6368` | Main and secondary text |
+| Duplicates | `#fde7c4` on `#a24a00` | The DUP indicator on a header |
+| No duplicates | `#34a853` | The ✓ on a header |
+| Error | `#c5221f` | "No matches" in the search panel |
+
+Selection style: the cells of a block are tinted and the block is outlined along its outer edge. The active cell, where typing goes, is white with its own outline. The row numbers and headers the block covers are shaded, and a whole selected column has a darker header.
+
+## Beyond the original scope
+
+Added after the MVP was specified:
+
+- **Duplicate indicator on every header**, shown as soon as a file opens: DUP when the column has repeated values, a check mark when it does not. Clicking DUP shows only the duplicates of that column.
+- **Several documents in tabs.** Each tab has its own history, filters, sort and search position. Save, undo, redo and Find act on the tab in focus. Several files can be chosen in the Open dialog; a file that is already open is brought forward instead of opened twice.
+- **Drag and drop** of one or more CSV files onto the window; each opens in its own tab.
+- **Selecting blocks** by dragging, with Shift and the arrows, and with Ctrl+Shift and the arrows to the end of a row or column. Whole rows and columns by their number or header. Ctrl+A selects everything.
+- **Ctrl and the arrows** jump to the first or last row or column.
+- **Copy, cut and paste** of cells, blocks, rows and columns, as the tab-separated text that Excel and Google Sheets use. A single value pasted over a selection fills it. Lines that do not fit become new rows and a block that is too wide adds columns, so nothing is dropped.
+- **Delete** empties the selected cells.
+
+## Verification
+
+- The model, the CSV handling and the clipboard format have unit tests (`npm test`).
+- `src/integration.test.ts` runs the H7 scenario on a Windows-1252 file with semicolons and CRLF: filter, sort, search, fill, edit, paste, undo two steps, save with the filter still on, reopen. The saved bytes are compared with the expected text, and the reopened table cell by cell.
+- The same scenario was run against the real application in Chrome with real clicks, key presses, drag of the fill handle and clipboard, and the saved file matched byte for byte.
+- The interface itself has no automated tests; it was checked by hand in Chrome.
 
 ## Sources
 

@@ -103,12 +103,12 @@ How it holds together:
 
 ## Status and limits
 
-Milestones H1 to H6 of [the specification](CSV%20Editor%20MVP%20Specification.md) are done, plus
-several things beyond it: tabs, drag and drop, block selection and copy and paste.
+All seven milestones of [the specification](CSV%20Editor%20MVP%20Specification.md) are done, and its
+decisions D-01 to D-09 are closed there, each with what the editor does. On top of the original scope
+there are tabs, drag and drop, block selection, copy and paste, and the duplicate indicators.
 
-Still open for H7, the wrap-up: a combined test of filtering, sorting, searching, filling, undoing and
-saving, the final colour palette, and closing decisions D-01 to D-09 in the specification. The
-defaults it proposes are what the editor does today.
+The look comes from one palette, defined as named values at the top of
+[`src/style.css`](src/style.css) and described in the specification under *Design*.
 
 Known limits:
 
@@ -120,5 +120,6 @@ Known limits:
 - A file with mixed line endings is saved with the first one it uses.
 - Windows-1252 and ISO-8859-1 cannot be told apart automatically and are treated as one encoding. If
   you type a character that encoding cannot represent, the editor asks before saving as UTF-8.
-- The unit tests cover the model, the CSV handling and the clipboard format. The interface was
-  checked by hand in Chrome, not with automated tests.
+- The unit tests cover the model, the CSV handling, the clipboard format and a combined scenario
+  (filter, sort, search, fill, edit, paste, undo, save and reopen a Windows-1252 file). The interface
+  itself was checked by hand in Chrome, not with automated tests.

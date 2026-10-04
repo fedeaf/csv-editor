@@ -55,6 +55,7 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
     },
     setMessage(text, isError = false) {
       message.textContent = text
+      message.title = text // the full text, in case a narrow window cuts it short
       message.classList.toggle('error', isError)
     },
   }
