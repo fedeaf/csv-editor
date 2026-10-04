@@ -1,106 +1,66 @@
 /*
  * Palette. Every colour in this file comes from these names, so the look can be changed here.
  * One accent blue, a cool-grey neutral scale, and a few colours that only carry meaning.
+ *
+ * Each colour is written once as light-dark(light value, dark value). Which one applies depends on
+ * color-scheme: by default the system's choice, and Menu > Dark Mode sets data-theme on the page to
+ * force one for the session. The accent turns lighter in the dark theme and the text on it dark.
  */
 :root {
-  color-scheme: light dark; /* native controls and scrollbars follow the theme */
+  color-scheme: light dark; /* native controls and scrollbars follow the theme too */
 
   /* text */
-  --ink: #202124;
-  --ink-muted: #5f6368;
-  --ink-subtle: #70757a;
-  --ink-disabled: #9aa0a6;
+  --ink: light-dark(#202124, #e8eaed);
+  --ink-muted: light-dark(#5f6368, #bdc1c6);
+  --ink-subtle: light-dark(#70757a, #9aa0a6);
+  --ink-disabled: light-dark(#9aa0a6, #6f757b);
 
   /* surfaces and lines */
-  --surface: #fff;
-  --surface-alt: #fafafa; /* every other grid row */
-  --chrome: #f1f3f4; /* toolbar, headers, row numbers, status bar */
-  --chrome-hover: #dadce0;
-  --chrome-hover-soft: #e4e7ea;
-  --line: #d4d4d4;
-  --line-soft: #ececec; /* grid lines */
+  --surface: light-dark(#fff, #202124);
+  --surface-alt: light-dark(#fafafa, #25262a); /* every other grid row */
+  --chrome: light-dark(#f1f3f4, #2b2c2f); /* toolbar, headers, row numbers, status bar */
+  --chrome-hover: light-dark(#dadce0, #3c4043);
+  --chrome-hover-soft: light-dark(#e4e7ea, #34363a);
+  --line: light-dark(#d4d4d4, #4a4d52);
+  --line-soft: light-dark(#ececec, #35373b); /* grid lines */
 
   /* accent */
-  --accent: #1a73e8;
-  --accent-strong: #1557b0; /* a primary button when hovered */
-  --accent-ink: #fff;
-  --accent-wash: #e8f0fe; /* hover on menu items and list entries */
-  --accent-soft: #d2e3fc; /* an active header button */
-  --accent-tint: #e3edfb; /* a filtered header */
-  --accent-overlay: rgb(26 115 232 / 12%);
-  --accent-overlay-weak: rgb(26 115 232 / 8%);
+  --accent: light-dark(#1a73e8, #8ab4f8);
+  --accent-strong: light-dark(#1557b0, #aecbfa); /* a primary button when hovered */
+  --accent-ink: light-dark(#fff, #202124);
+  --accent-wash: light-dark(#e8f0fe, #2f3a4d); /* hover on menu items and list entries */
+  --accent-soft: light-dark(#d2e3fc, #3a4d6e); /* an active header button */
+  --accent-tint: light-dark(#e3edfb, #2d3a52); /* a filtered header */
+  --accent-overlay: light-dark(rgb(26 115 232 / 12%), rgb(138 180 248 / 16%));
+  --accent-overlay-weak: light-dark(rgb(26 115 232 / 8%), rgb(138 180 248 / 10%));
 
   /* selection */
-  --selection-fill: #dce8fc; /* the cells of the selected block */
+  --selection-fill: light-dark(#dce8fc, #2d3d5c); /* the cells of the selected block */
   --selection-edge: var(--accent); /* the outline around the block and the active cell */
-  --selection-header: #dde3ea; /* row numbers and headers of the selected rows and columns */
-  --selection-header-strong: #c9d8f0; /* the header of a whole selected column */
+  --selection-header: light-dark(#dde3ea, #3a4150); /* row numbers and headers of the selected rows and columns */
+  --selection-header-strong: light-dark(#c9d8f0, #4a5d82); /* the header of a whole selected column */
 
   /* meaning */
-  --warn-bg: #fde7c4; /* duplicates present */
-  --warn-bg-hover: #fbd49a;
-  --warn-ink: #a24a00;
-  --notice-bg: #fff4ce; /* the banner for rows that were padded or widened */
-  --notice-line: #e6d28a;
-  --ok: #34a853; /* no duplicates */
-  --danger: #c5221f; /* no matches, and a button that discards */
-  --danger-strong: #a50e0e;
-  --scrim: rgb(32 33 36 / 45%); /* the dim layer behind a dialog */
+  --warn-bg: light-dark(#fde7c4, #4d3b19); /* duplicates present */
+  --warn-bg-hover: light-dark(#fbd49a, #60491f);
+  --warn-ink: light-dark(#a24a00, #f4b960);
+  --notice-bg: light-dark(#fff4ce, #3f3818); /* the banner for rows that were padded or widened */
+  --notice-line: light-dark(#e6d28a, #6e6025);
+  --ok: light-dark(#34a853, #81c995); /* no duplicates */
+  --danger: light-dark(#c5221f, #f28b82); /* no matches, and a button that discards */
+  --danger-strong: light-dark(#a50e0e, #f6aea9);
+  --scrim: light-dark(rgb(32 33 36 / 45%), rgb(0 0 0 / 60%)); /* the dim layer behind a dialog */
 
-  --shadow-popup: 0 4px 14px rgb(0 0 0 / 20%);
-  --shadow-panel: 0 2px 10px rgb(0 0 0 / 20%);
+  --shadow-color: light-dark(rgb(0 0 0 / 20%), rgb(0 0 0 / 55%));
+  --shadow-popup: 0 4px 14px var(--shadow-color);
+  --shadow-panel: 0 2px 10px var(--shadow-color);
 
   font: 13px/1.4 system-ui, sans-serif;
   color: var(--ink);
   accent-color: var(--accent); /* checkboxes */
 }
-
-/*
- * Dark theme: the same names with other values, applied when the system asks for a dark look.
- * The accent turns lighter so it still stands out, and the text on it turns dark.
- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e8eaed;
-    --ink-muted: #bdc1c6;
-    --ink-subtle: #9aa0a6;
-    --ink-disabled: #6f757b;
-
-    --surface: #202124;
-    --surface-alt: #25262a;
-    --chrome: #2b2c2f;
-    --chrome-hover: #3c4043;
-    --chrome-hover-soft: #34363a;
-    --line: #4a4d52;
-    --line-soft: #35373b;
-
-    --accent: #8ab4f8;
-    --accent-strong: #aecbfa;
-    --accent-ink: #202124;
-    --accent-wash: #2f3a4d;
-    --accent-soft: #3a4d6e;
-    --accent-tint: #2d3a52;
-    --accent-overlay: rgb(138 180 248 / 16%);
-    --accent-overlay-weak: rgb(138 180 248 / 10%);
-
-    --selection-fill: #2d3d5c;
-    --selection-header: #3a4150;
-    --selection-header-strong: #4a5d82;
-
-    --warn-bg: #4d3b19;
-    --warn-bg-hover: #60491f;
-    --warn-ink: #f4b960;
-    --notice-bg: #3f3818;
-    --notice-line: #6e6025;
-    --ok: #81c995;
-    --danger: #f28b82;
-    --danger-strong: #f6aea9;
-    --scrim: rgb(0 0 0 / 60%);
-
-    --shadow-popup: 0 4px 14px rgb(0 0 0 / 55%);
-    --shadow-panel: 0 2px 10px rgb(0 0 0 / 55%);
-  }
-}
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; }
 
 /* Form controls take their text colour from the page, so they follow the theme too. */
 button, input, textarea { color: inherit; }
@@ -148,6 +108,12 @@ body { display: flex; flex-direction: column; background: var(--surface); }
 .popup-menu kbd { font: inherit; color: var(--ink-subtle); }
 .popup-menu .separator { padding: 0; margin: 4px 0; height: 1px; background: var(--line); cursor: default; }
 .context-menu { position: fixed; z-index: 30; min-width: 170px; }
+
+/* The switch of a menu entry that turns something on and off */
+.switch { position: relative; flex: none; width: 28px; height: 16px; margin-top: 1px; border-radius: 8px; background: var(--chrome-hover); transition: background 0.15s; }
+.switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink-subtle); transition: transform 0.15s, background 0.15s; }
+[aria-checked='true'] > .switch { background: var(--accent); }
+[aria-checked='true'] > .switch::after { background: var(--accent-ink); transform: translateX(12px); }
 
 /*
  * Selection. A block of cells is tinted and outlined; the active cell, where typing goes, is white

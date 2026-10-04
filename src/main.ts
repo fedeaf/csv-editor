@@ -12,6 +12,7 @@ import { Grid, type FillRequest, type GridModel, type GridState, type Rect } fro
 import { confirmDialog, isDialogOpen, messageDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
 import { fileInfo, plural, selectionSummary } from './ui/status'
+import { currentTheme, toggleTheme, watchTheme } from './ui/theme'
 import { createTabBar, tabAfterClose } from './ui/tabBar'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -543,7 +544,17 @@ const actions: Record<string, () => void | Promise<void>> = {
   redo,
   'clear-filters': clearFilters,
   find: () => search.open(),
+  'dark-mode': () => {
+    toggleTheme()
+    showTheme()
+  },
 }
+
+/** The Dark Mode switch in the menu shows the theme in use. */
+function showTheme(): void {
+  $('menu-list').querySelector('[data-action=dark-mode]')!.setAttribute('aria-checked', String(currentTheme() === 'dark'))
+}
+watchTheme(showTheme)
 
 const menuButton = $('menu-button')
 const menuList = $('menu-list')
@@ -561,6 +572,11 @@ $('empty-open').addEventListener('click', () => {
 menuList.addEventListener('click', (e) => {
   const item = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')
   if (!item || item.classList.contains('disabled')) return
+  // A switch stays where it is, so the change can be seen; the other entries close the menu.
+  if (item.hasAttribute('data-keep-open')) {
+    void actions[item.dataset.action!]!()
+    return
+  }
   setMenu(false)
   Promise.resolve(actions[item.dataset.action!]!()).catch(report).finally(() => grid.focus())
 })

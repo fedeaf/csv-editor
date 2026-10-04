@@ -4,17 +4,36 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./style.css', import.meta.url), 'utf8')
-const tokens = (block: string) =>
-  Object.fromEntries([...block.matchAll(/--([\w-]+):\s*([^;]+?);/g)].map((m) => [m[1]!, m[2]!.replace(/\/\*.*\*\//, '').trim()]))
+const paletteBlock = css.match(/:root \{([\s\S]*?)\n\}/)![1]!
+const raw = Object.fromEntries(
+  [...paletteBlock.matchAll(/--([\w-]+):\s*([^;]+?);/g)].map((m) => [m[1]!, m[2]!.replace(/\/\*.*\*\//, '').trim()]),
+)
 
-const light = tokens(css.match(/:root \{([\s\S]*?)\n\}/)![1]!)
-const dark = { ...light, ...tokens(css.match(/prefers-color-scheme: dark\) \{\s*:root \{([\s\S]*?)\n  \}/)![1]!) }
+/** Splits the two arguments of light-dark(a, b) at the comma that is not inside brackets. */
+function splitLightDark(value: string): [string, string] | undefined {
+  if (!value.startsWith('light-dark(')) return undefined
+  const inner = value.slice('light-dark('.length, -1)
+  let depth = 0
+  for (let i = 0; i < inner.length; i++) {
+    if (inner[i] === '(') depth++
+    else if (inner[i] === ')') depth--
+    else if (inner[i] === ',' && depth === 0) return [inner.slice(0, i).trim(), inner.slice(i + 1).trim()]
+  }
+  return undefined
+}
 
-function resolve(theme: Record<string, string>, value: string): string {
-  while (value.startsWith('var(')) value = theme[value.slice(6, -1)]!
+type Theme = Record<string, string>
+const theme = (side: 0 | 1): Theme =>
+  Object.fromEntries(Object.entries(raw).map(([name, value]) => [name, splitLightDark(value)?.[side] ?? value]))
+const light = theme(0)
+const dark = theme(1)
+
+function resolve(t: Theme, value: string): string {
+  while (value.startsWith('var(')) value = t[value.slice(6, -1)]!
   return value
 }
-const channels = (hex: string) => (hex.replace('#', '').length === 3 ? [...hex.replace('#', '')].map((c) => c + c) : hex.replace('#', '').match(/../g)!).map((x) => parseInt(x, 16))
+const channels = (hex: string) =>
+  (hex.replace('#', '').length === 3 ? [...hex.replace('#', '')].map((c) => c + c) : hex.replace('#', '').match(/../g)!).map((x) => parseInt(x, 16))
 function luminance(hex: string): number {
   const [r, g, b] = channels(hex).map((v) => {
     const s = v / 255
@@ -22,8 +41,8 @@ function luminance(hex: string): number {
   }) as [number, number, number]
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
-function contrast(theme: Record<string, string>, a: string, b: string): number {
-  const [hi, lo] = [luminance(resolve(theme, theme[a]!)), luminance(resolve(theme, theme[b]!))].sort((x, y) => y - x) as [number, number]
+function contrast(t: Theme, a: string, b: string): number {
+  const [hi, lo] = [luminance(resolve(t, t[a]!)), luminance(resolve(t, t[b]!))].sort((x, y) => y - x) as [number, number]
   return (hi + 0.05) / (lo + 0.05)
 }
 
@@ -55,20 +74,27 @@ const pairs: [string, string, number][] = [
 describe.each([
   ['light', light],
   ['dark', dark],
-])('the %s palette', (_name, theme) => {
+])('the %s palette', (_name, t) => {
   it.each(pairs)('%s on %s is at least %d:1', (text, background, minimum) => {
-    expect(contrast(theme, text, background)).toBeGreaterThanOrEqual(minimum)
+    expect(contrast(t, text, background)).toBeGreaterThanOrEqual(minimum)
   })
 })
 
 describe('the palette', () => {
-  it('gives the dark theme a value for every colour that differs in the light one', () => {
-    const colours = Object.keys(light).filter((k) => /^#|^rgb/.test(light[k]!) && !k.startsWith('shadow'))
-    const missing = colours.filter((k) => dark[k] === light[k] && !['ink-disabled'].includes(k) && !/^(selection-edge)$/.test(k))
-    expect(missing).toEqual([])
+  it('writes every colour once, with both of its values', () => {
+    const plain = Object.entries(raw).filter(([, v]) => /^#|^rgb\(/.test(v)).map(([k]) => k)
+    expect(plain).toEqual([])
+  })
+  it('gives the dark theme different text and surfaces', () => {
+    for (const name of ['ink', 'ink-muted', 'surface', 'chrome', 'line', 'accent']) expect(dark[name]).not.toBe(light[name])
   })
   it('uses no colour outside the palette', () => {
-    const outside = css.replace(/:root \{[\s\S]*?\n\}/, '').replace(/@media \(prefers-color-scheme: dark\) \{[\s\S]*?\n\}\n/, '')
+    const outside = css.replace(/:root \{[\s\S]*?\n\}/, '')
     expect([...outside.matchAll(/#[0-9a-fA-F]{3,8}\b|rgb\([^)]*\)/g)].map((m) => m[0]).filter((c) => c !== '#0000')).toEqual([])
+  })
+  it('lets the page force either theme, and follows the system otherwise', () => {
+    expect(css).toMatch(/color-scheme: light dark/)
+    expect(css).toMatch(/:root\[data-theme='light'\] \{ color-scheme: light; \}/)
+    expect(css).toMatch(/:root\[data-theme='dark'\] \{ color-scheme: dark; \}/)
   })
 })

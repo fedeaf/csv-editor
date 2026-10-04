@@ -34,5 +34,12 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 export default defineConfig({
   base: './',
   plugins: [singleFile()],
-  build: { cssCodeSplit: false, assetsInlineLimit: Infinity, modulePreload: false },
+  build: {
+    cssCodeSplit: false,
+    assetsInlineLimit: Infinity,
+    modulePreload: false,
+    // The editor is for current Chrome only, so the CSS can use light-dark() as written. With an older
+    // target the minifier rewrites it into a media-query trick that would be less robust.
+    cssTarget: 'chrome123',
+  },
 })

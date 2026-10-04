@@ -30,7 +30,7 @@ undo, redo and Find only act on the tab in focus.
 | **Find and replace** | `Ctrl+F` opens a floating panel. Case-insensitive, partial match by default, with an *entire cell* option. It searches the rows shown, row by row, and wraps around. A second row of the same panel is for replacing: **Replace** changes the selected match (every occurrence in that cell) and moves to the next one, and **Replace all** changes every match in the rows shown as one undo step. There is no separate shortcut for it. |
 | **Fill** | Drag the handle at the corner of the selected cell, or double-click it to copy the value down the whole column. Values are copied as they are, with no series. With a filter active, only the rows shown change. |
 | **Columns** | Drag the right edge of a header to resize its column, or double-click the edge to fit the column to its longest cells and its header. Widths are kept per document and are not saved in the file. |
-| **Theme** | A light and a dark look. The editor follows the system setting (`prefers-color-scheme`), so there is no switch inside the page. |
+| **Theme** | A light and a dark look. The page opens with the system's setting; **Menu ▸ Dark Mode** switches it for as long as the page stays open. The choice is not saved anywhere: the next visit starts from the system again. |
 | **Status bar** | The left side shows the size of the selection ("Selected 3 rows × 2 columns (6 cells)") or, for a few seconds, the result of the last action ("✓ Saved", "✓ Pasted"). The right side describes the file: rows, columns, encoding and delimiter, and how many rows a filter leaves visible. |
 | **Selection** | Select blocks by dragging, or with `Shift` and the arrows. Click a row number or a header to select the whole row or column. |
 | **Copy and paste** | `Ctrl+C`, `Ctrl+X` and `Ctrl+V` on a cell, a block, a row or a column. The clipboard format is the tab-separated text that Excel and Google Sheets use. See below. |
@@ -111,7 +111,7 @@ decisions D-01 to D-09 are closed there, each with what the editor does. On top 
 there are tabs, drag and drop, block selection, copy and paste, and the duplicate indicators.
 
 The look comes from one palette, defined as named values at the top of
-[`src/style.css`](src/style.css), once for the light theme and once for the dark one, and described in the
+[`src/style.css`](src/style.css), with each colour written once for both themes, and described in the
 specification under *Design*. A test keeps the text readable in both themes (WCAG contrast ratios).
 
 Known limits:
