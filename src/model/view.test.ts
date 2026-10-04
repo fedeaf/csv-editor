@@ -206,3 +206,45 @@ describe('filters', () => {
     expect(view.rowCount).toBe(3)
   })
 })
+
+describe('spreadsheet errors in a column', () => {
+  it('counts the cells that hold an error, and shows a few of them once each', () => {
+    const { view, table } = setup([['#N/A'], ['ok'], ['#n/a'], ['#DIV/0!'], [' #REF! '], ['#NAME?'], ['']], ['k'])
+    const stat = view.stats.get(table.colIds[0]!)
+    expect(stat.errorCells).toBe(5)
+    expect(stat.errorExamples).toEqual(['#N/A', '#DIV/0!', '#REF!']) // "#n/a" is the same error as "#N/A"
+  })
+
+  it('has none in a clean column, and text that only looks like an error does not count', () => {
+    const { view, table } = setup([['N/A'], ['NaN'], ['null'], ['#1'], ['div0'], ['x #N/A']], ['k'])
+    const stat = view.stats.get(table.colIds[0]!)
+    expect(stat.errorCells).toBe(0)
+    expect(stat.errorExamples).toEqual([])
+  })
+
+  it('is per column', () => {
+    const { view, table } = setup([['a', '#N/A'], ['b', 'ok']])
+    expect(view.stats.get(table.colIds[0]!).errorCells).toBe(0)
+    expect(view.stats.get(table.colIds[1]!).errorCells).toBe(1)
+  })
+
+  it('goes away when the last error is edited, and comes back with undo', () => {
+    const { view, table, history } = setup([['#N/A'], ['ok']], ['k'])
+    const id = table.colIds[0]!
+    expect(view.stats.get(id).errorCells).toBe(1)
+    const fix = setCell(table, table.order[0]!, 0, 'fixed')
+    history.execute(fix, table)
+    view.stats.invalidate(fix.invalidates)
+    expect(view.stats.get(id).errorCells).toBe(0)
+    const undone = history.undo(table)!
+    view.stats.invalidate(undone.command.invalidates)
+    expect(view.stats.get(id).errorCells).toBe(1)
+  })
+
+  it('does not mix up with duplicates: a repeated error is both', () => {
+    const { view, table } = setup([['#N/A'], ['#N/A'], ['x']], ['k'])
+    const stat = view.stats.get(table.colIds[0]!)
+    expect(stat.errorCells).toBe(2)
+    expect(stat.duplicateValues).toBe(1)
+  })
+})

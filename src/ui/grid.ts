@@ -24,6 +24,9 @@ export interface ColumnInfo {
   /** Distinct values that repeat in the column, and how many rows hold them. */
   duplicateValues: number
   duplicateRows: number
+  /** Cells that hold a spreadsheet error, and a few of the errors for the tooltip. */
+  errorCells: number
+  errorExamples: string[]
 }
 
 /** A fill from the cell (row, col) to (toRow, toCol): the same row or the same column. */
@@ -61,6 +64,8 @@ export interface GridHandlers {
   onSort(col: number, dir: 'asc' | 'desc'): void
   onFilter(col: number, anchor: HTMLElement): void
   onDuplicates(col: number): void
+  /** The warning ahead of a header was clicked: go to the next cell with a spreadsheet error. */
+  onWarning(col: number): void
   onCellEdit(row: number, col: number, value: string): void
   onHeaderEdit(col: number, value: string): void
   /** The grid has already selected what was clicked. */
@@ -605,6 +610,7 @@ export class Grid {
       case 'sort-desc': return this.handlers.onSort(col, 'desc')
       case 'filter': return this.handlers.onFilter(col, button)
       case 'dup': return this.handlers.onDuplicates(col)
+      case 'warning': return this.handlers.onWarning(col)
     }
   }
 
@@ -677,6 +683,16 @@ export class Grid {
     const text = el('span', 'header-text')
     text.textContent = name
     text.title = name
+    // A warning ahead of the name, only while the column holds a spreadsheet error. Clicking it walks
+    // through those cells.
+    let warning: HTMLElement | undefined
+    if (info.errorCells > 0) {
+      const count = `${info.errorCells.toLocaleString('en-US')} ${info.errorCells === 1 ? 'cell holds' : 'cells hold'}`
+      warning = button('warning', '', `${count} a spreadsheet error: ${info.errorExamples.join(', ')}. Click to go to each one.`)
+      warning.classList.add('col-warning')
+      warning.setAttribute('aria-label', warning.title)
+      warning.innerHTML = WARNING
+    }
     const dup = button('dup', info.duplicateValues > 0 ? 'dup' : '✓')
     dup.classList.add(info.duplicateValues > 0 ? 'has' : 'none')
     dup.title =
@@ -693,7 +709,7 @@ export class Grid {
     const resizer = el('div', 'col-resizer')
     resizer.dataset.role = 'resize'
     resizer.title = 'Drag to resize. Double-click to fit the content.'
-    node.append(text, dup, asc, desc, filter, resizer)
+    node.append(...(warning ? [warning] : []), text, dup, asc, desc, filter, resizer)
     return node
   }
 
@@ -906,7 +922,8 @@ export class Grid {
       for (let r = 0; r < model!.rowCount; r++) yield model!.cells(r)[col] ?? ''
     }
     // Measuring every cell of a large file would be slow; the longest few decide the width.
-    this.setWidth(col, fitWidth(longestStrings(column(), 40), model.headers[col] ?? '', measure))
+    const warningRoom = model.column(col).errorCells > 0 ? 18 : 0
+    this.setWidth(col, fitWidth(longestStrings(column(), 40), model.headers[col] ?? '', measure, 18, 110 + warningRoom))
     this.handlers.onColumnResize(col, this.colWidth(col))
   }
 
@@ -1015,6 +1032,9 @@ function el(tag: string, className: string): HTMLElement {
   node.className = className
   return node
 }
+
+const WARNING =
+  '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v4" stroke="var(--chrome)" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.9" r="0.95" fill="var(--chrome)"/></svg>'
 
 const FUNNEL =
   '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M1 2h10L7 6.5V10L5 11V6.5z" fill="currentColor"/></svg>'

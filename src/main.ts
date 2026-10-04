@@ -3,6 +3,7 @@ import { parseTsv, squared, toTsv } from './model/clipboard'
 import { encodeDocumentAsync, type CsvDocument } from './document'
 import { hasFiles, openCsv, readDropped, saveCsv, saveCsvAs } from './files'
 import { History, type Outcome } from './model/history'
+import { nextErrorRow } from './model/errors'
 import { createMatcher, findMatch, findReplacements, type Position } from './model/search'
 import { TableView, uniqueValues, type ColumnFilter } from './model/view'
 import { closeContextMenu, showContextMenu } from './ui/contextMenu'
@@ -29,6 +30,8 @@ interface Tab {
   history: History
   /** Display position of the last search match, where "Next" continues from. */
   lastMatch: Position | undefined
+  /** The last error cell reached from a header's warning, so the next click goes on to the following one. */
+  lastError: { colId: number; row: number } | undefined
   /** Scroll and selection to restore when the tab is selected again. */
   state: GridState | undefined
 }
@@ -50,6 +53,7 @@ const grid = new Grid($('grid-host'), {
   },
   onFilter: openFilter,
   onDuplicates: toggleDuplicates,
+  onWarning: goToError,
   onFill: fill,
   onClear: (rect) => clearCells(rect),
   onColumnResize: (col, width) => current?.view.widths.set(current.doc.table.colIds[col]!, width),
@@ -85,6 +89,8 @@ function modelFor(v: TableView): GridModel {
         filtered: v.filters.has(colId),
         duplicateValues: stat.duplicateValues,
         duplicateRows: stat.duplicateRows,
+        errorCells: stat.errorCells,
+        errorExamples: stat.errorExamples,
       }
     },
   }
@@ -149,7 +155,7 @@ async function openDocuments(docs: CsvDocument[]): Promise<void> {
   for (const doc of docs) {
     let tab = await findOpenTab(doc)
     if (!tab) {
-      tab = { id: nextTabId++, doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, state: undefined }
+      tab = { id: nextTabId++, doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, state: undefined }
       tabs.push(tab)
     }
     first ??= tab
@@ -224,6 +230,7 @@ function showMeta(message?: string, neutral = false): void {
 
 /** After a command ran, was undone or redone: refresh statistics, filters and grid, then place the cursor. */
 function applyOutcome(tab: Tab, { command, cursor }: Outcome): void {
+  tab.lastError = undefined // rows may have moved or errors been fixed: the next walk starts from the top
   tab.view.stats.invalidate(command.invalidates)
   const target = cursor ?? {}
   tab.view.afterChange(target.reveal)
@@ -448,6 +455,34 @@ function replaceAll(): void {
 }
 
 
+// --- spreadsheet errors ----------------------------------------------------------------------
+
+/**
+ * Click on a header's warning: go to the first cell with a spreadsheet error in that column, and with
+ * each further click to the next, starting over after the last. Only rows shown are visited, like Find.
+ */
+function goToError(col: number): void {
+  const tab = current
+  if (!tab) return
+  grid.commitEdit()
+  const { table } = tab.doc
+  const v = tab.view
+  const colId = table.colIds[col]!
+  const cell = (row: number) => table.rowById(v.visible[row]!)!.cells[col]!
+  const from = tab.lastError?.colId === colId ? tab.lastError.row : undefined
+  const stop = nextErrorRow(cell, v.rowCount, from)
+  if (!stop) {
+    const hidden = v.stats.get(colId).errorCells
+    showMeta(hidden > 0 ? `${plural(hidden, 'error cell')} in this column ${hidden === 1 ? 'is' : 'are'} in rows hidden by a filter` : 'No spreadsheet errors in this column', true)
+    return
+  }
+  tab.lastError = { colId, row: stop.row }
+  grid.setActive(stop.row, col)
+  grid.focus()
+  const name = table.headers[col] || `column ${col + 1}`
+  showMeta(`Error ${stop.index} of ${stop.total} in "${name}": ${cell(stop.row).trim()}${stop.wrapped ? ' (back at the first)' : ''}`, true)
+}
+
 // --- filters (view only: not part of history, never delete rows) -------------------------
 
 function setFilter(colId: number, filter: ColumnFilter | undefined): void {
@@ -455,6 +490,7 @@ function setFilter(colId: number, filter: ColumnFilter | undefined): void {
   if (!tab) return
   tab.view.setFilter(colId, filter)
   tab.lastMatch = undefined
+  tab.lastError = undefined
   grid.refresh()
   grid.setActive(0, grid.activeCell.col)
   showMeta()
@@ -465,6 +501,7 @@ function clearFilters(): void {
   if (!tab?.view.filtered) return
   tab.view.clearFilters()
   tab.lastMatch = undefined
+  tab.lastError = undefined
   grid.refresh()
   showMeta()
 }

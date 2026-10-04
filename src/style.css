@@ -147,6 +147,10 @@ body { display: flex; flex-direction: column; background: var(--surface); }
 .hbtn.dup.none { color: var(--ok); opacity: 0.6; cursor: default; }
 .hbtn.dup.none:hover { background: transparent; }
 .header-cell.filtered { background: var(--accent-tint); }
+/* The warning ahead of a header's name: this column holds spreadsheet errors such as #N/A. Clicking it goes to them. */
+.hbtn.col-warning { width: 18px; margin-right: 2px; padding: 0; color: var(--danger); background: transparent; }
+.hbtn.col-warning:hover { background: var(--chrome-hover); color: var(--danger); }
+.col-warning svg { display: block; }
 
 /* AutoFilter dropdown */
 .filter-dropdown { position: fixed; z-index: 40; width: 270px; padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-popup); font-weight: 400; }

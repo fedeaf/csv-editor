@@ -1,3 +1,4 @@
+import { isSpreadsheetError } from './errors'
 import type { Table } from './table'
 
 /** Value filter and duplicates filter for one column; both must match (FIL-03). */
@@ -14,6 +15,10 @@ export interface ColumnStat {
   duplicateValues: number
   /** Rows holding one of those values. */
   duplicateRows: number
+  /** Cells holding a spreadsheet error such as #N/A or #DIV/0!. */
+  errorCells: number
+  /** A few of those errors, each once, to show in the tooltip. */
+  errorExamples: string[]
 }
 
 /**
@@ -21,6 +26,8 @@ export interface ColumnStat {
  * Duplicates follow D-05: exact equality, case and whitespace sensitive, blanks never count.
  * They are always measured over every row, whatever other filters are active.
  */
+const MAX_ERROR_EXAMPLES = 3
+
 export class ColumnStats {
   private cache = new Map<number, ColumnStat>()
 
@@ -56,7 +63,18 @@ export class ColumnStats {
         duplicateRows += n
       }
     }
-    return { counts, duplicateValues, duplicateRows }
+    // Errors are found among the distinct values, so this costs nothing on the rows themselves.
+    let errorCells = 0
+    const seen = new Set<string>()
+    const errorExamples: string[] = []
+    for (const [value, n] of counts) {
+      if (!isSpreadsheetError(value)) continue
+      errorCells += n
+      const key = value.trim().toUpperCase()
+      if (!seen.has(key) && errorExamples.length < MAX_ERROR_EXAMPLES) errorExamples.push(value.trim())
+      seen.add(key)
+    }
+    return { counts, duplicateValues, duplicateRows, errorCells, errorExamples }
   }
 }
 
