@@ -105,7 +105,8 @@ function activate(tab: Tab | undefined): void {
   )
   search.setMessage('')
   showMeta()
-  grid.focus()
+  if (tab) grid.focus()
+  else $('empty-open').focus() // the start screen's button, so Enter opens a file
 }
 
 function closeTab(tab: Tab | undefined): void {
@@ -448,6 +449,9 @@ menuButton.addEventListener('click', () => setMenu(menuList.hidden !== false))
 document.addEventListener('click', (e) => {
   if (!(e.target as Element).closest('.menu')) setMenu(false)
 })
+$('empty-open').addEventListener('click', () => {
+  Promise.resolve(actions.open!()).catch(report)
+})
 menuList.addEventListener('click', (e) => {
   const item = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')
   if (!item || item.classList.contains('disabled')) return
@@ -557,6 +561,7 @@ window.addEventListener('beforeunload', (e) => {
 })
 
 showMeta()
+$('empty-open').focus({ preventScroll: true })
 
 // Test hook for headless runs, where native file pickers cannot be driven.
 if (import.meta.env.DEV) {

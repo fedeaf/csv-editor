@@ -12,7 +12,7 @@ Chrome by double-clicking it. No server, no install, nothing to download.
 
 ## Using it
 
-Open a file with **Menu ▸ Open…**, or drag one or more `.csv` files onto the window. Each file opens
+Open a file with the **Open file…** button on the start screen or **Menu ▸ Open…**, or drag one or more `.csv` files onto the window. Each file opens
 in its own tab and works independently: its own history, filters, sort and search position. Save,
 undo, redo and Find only act on the tab in focus.
 
