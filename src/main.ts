@@ -1,9 +1,9 @@
-import { deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, setCell, sortRows, type Command } from './model/commands'
+import { deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, setCell, sortRows, type Command } from './model/commands'
 import { parseTsv, squared, toTsv } from './model/clipboard'
 import { encodeDocumentAsync, type CsvDocument } from './document'
 import { hasFiles, openCsv, readDropped, saveCsv, saveCsvAs } from './files'
 import { History, type Outcome } from './model/history'
-import { findMatch, type Position } from './model/search'
+import { createMatcher, findMatch, findReplacements, type Position } from './model/search'
 import { TableView, uniqueValues, type ColumnFilter } from './model/view'
 import { closeContextMenu, showContextMenu } from './ui/contextMenu'
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
@@ -358,19 +358,21 @@ document.addEventListener('paste', pasteClipboard)
 // --- search (BUS-01 to BUS-07) -------------------------------------------------------------
 
 const search = createSearchPanel({
-  onSearch: () => find('first'),
-  onStep: (direction) => find(direction === 1 ? 'next' : 'previous'),
+  onSearch: () => void find('first'),
+  onStep: (direction) => void find(direction === 1 ? 'next' : 'previous'),
+  onReplace: replaceCurrent,
+  onReplaceAll: replaceAll,
   onClose: () => grid.focus(),
 })
 
 /** Searches the rows shown in the tab in focus, selects the match and scrolls to it. A new search starts at the first cell. */
-function find(mode: 'first' | 'next' | 'previous'): void {
+function find(mode: 'first' | 'next' | 'previous'): boolean {
   const tab = current
   const query = search.query
   if (!tab || query === '') {
     if (tab) tab.lastMatch = undefined
     search.setMessage('')
-    return
+    return false
   }
   grid.commitEdit()
   const { table } = tab.doc
@@ -385,13 +387,65 @@ function find(mode: 'first' | 'next' | 'previous'): void {
   if (!match) {
     tab.lastMatch = undefined
     search.setMessage('No matches', true)
-    return
+    return false
   }
   tab.lastMatch = match
   grid.setActive(match.row, match.col)
   const name = table.headers[match.col] || `column ${match.col + 1}`
   search.setMessage(`Row ${v.rowNumber(match.row)}, ${name}`)
+  return true
 }
+
+/**
+ * Replace: if the selected cell matches, its text is replaced (every occurrence in it) and the next
+ * match is selected; if it does not, this just goes to the next match, so repeated presses walk through
+ * the matches one at a time, replacing each.
+ */
+function replaceCurrent(): void {
+  const tab = current
+  const query = search.query
+  if (!tab || query === '') return
+  grid.commitEdit()
+  const { table } = tab.doc
+  const { row, col } = grid.activeCell
+  const rowId = tab.view.idAt(row)
+  let replaced = false
+  if (rowId !== undefined) {
+    const matcher = createMatcher(query, search.exact)
+    const value = table.rowById(rowId)!.cells[col]!
+    if (matcher.test(value)) {
+      const command = replaceCells(table, [{ rowId, col, value: matcher.replace(value, search.replacement) }])
+      if (command) run(command)
+      replaced = true
+    }
+  }
+  tab.lastMatch = grid.activeCell // carry on from here
+  const found = find('next')
+  if (replaced && !found) search.setMessage('No more matches')
+}
+
+/** Replace all: every match in the rows shown, as one undo step. Rows hidden by a filter are left alone. */
+function replaceAll(): void {
+  const tab = current
+  const query = search.query
+  if (!tab || query === '') return
+  grid.commitEdit()
+  const { table } = tab.doc
+  const v = tab.view
+  const shown = { rowCount: v.rowCount, colCount: table.columnCount, cell: (r: number, c: number) => table.rowById(v.visible[r]!)!.cells[c]! }
+  const changes = findReplacements(shown, query, search.exact, search.replacement)
+  if (changes.length === 0) {
+    const anyMatch = findMatch(shown, query, search.exact)
+    search.setMessage(anyMatch ? 'Nothing to change' : 'No matches', !anyMatch)
+    return
+  }
+  const command = replaceCells(table, changes.map((c) => ({ rowId: v.idAt(c.row)!, col: c.col, value: c.value })))
+  if (command) run(command)
+  tab.lastMatch = undefined
+  search.setMessage('')
+  showMeta(`Replaced ${plural(changes.length, 'cell')} in ${plural(new Set(changes.map((c) => c.row)).size, 'row')}`)
+}
+
 
 // --- filters (view only: not part of history, never delete rows) -------------------------
 
@@ -558,7 +612,7 @@ document.addEventListener('keydown', (e) => {
   } else if (key === 'g') {
     e.preventDefault()
     if (!search.isOpen) search.open()
-    find(e.shiftKey ? 'previous' : 'next')
+    void find(e.shiftKey ? 'previous' : 'next')
   } else if (key === 'z' && !e.shiftKey && !typing) {
     e.preventDefault()
     closeContextMenu()

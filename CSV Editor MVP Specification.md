@@ -305,6 +305,7 @@ Added after the MVP was specified:
 - **In-page dialogs** instead of the browser's own alert and confirm, for closing a tab with unsaved changes, for saving as UTF-8 when a character does not fit the file's encoding, and for errors. They name what each button does, start on Cancel when the action discards something, and keep keys and shortcuts from reaching the table underneath.
 - **A status bar in two parts.** On the left, the size of the selection, or for four seconds the result of the last action (saved, copied, pasted); a new selection replaces the message. On the right, the file's rows, columns, encoding and delimiter, and "Showing X of Y rows" under a filter.
 - **Dark theme**, following the system setting.
+- **Replace**, in a second row of the Find panel that is always shown, so it has no shortcut of its own. Replace changes the selected match, every occurrence of the text inside that cell, and goes on to the next; with *Match entire cell* it swaps the whole cell. Replace all changes every match as one undo step. The text to replace and the replacement are taken literally, matching ignores case, and only the rows shown are searched and changed (D-08), so rows hidden by a filter keep their text.
 - **Resizable columns.** Drag the edge of a header to resize a column, between 120 and 1200 pixels; double-click it to fit the content. The minimum leaves room for the header's controls. Widths belong to the view: they are kept per tab, are not part of the history and are not saved in the file.
 
 ## Verification

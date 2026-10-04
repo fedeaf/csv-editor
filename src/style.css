@@ -208,12 +208,15 @@ body.filling, body.filling * { cursor: crosshair !important; user-select: none; 
 
 /* Find panel: one row, sitting in the toolbar so it never covers the column headers */
 :root { --find-width: min(600px, calc(100vw - 300px)); }
-.search-panel { position: fixed; z-index: 35; top: 3px; right: 12px; display: flex; align-items: center; gap: 8px; width: var(--find-width); height: 32px; padding: 3px 4px 3px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-panel); }
+.search-panel { position: fixed; z-index: 35; top: 3px; right: 12px; width: var(--find-width); padding: 3px 4px 3px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-panel); }
 .search-panel[hidden] { display: none; }
-.sp-input { flex: 1; min-width: 80px; height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 3px; font: inherit; }
-.sp-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.sp-row { display: flex; align-items: center; gap: 8px; height: 24px; }
+.sp-row + .sp-row { margin-top: 4px; }
+.sp-input, .sp-replace { flex: 1; min-width: 80px; height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); font: inherit; }
+.sp-input:focus, .sp-replace:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .search-panel button { height: 24px; padding: 0 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); cursor: pointer; font: inherit; }
 .search-panel .sp-close { border: 0; padding: 0 6px; color: var(--ink-muted); }
+.search-panel button:disabled { color: var(--ink-disabled); cursor: default; }
 .sp-exact { display: flex; flex: none; align-items: center; gap: 4px; color: var(--ink-muted); white-space: nowrap; }
 .sp-message { flex: 0 1 auto; min-width: 0; max-width: 130px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-message.error { color: var(--danger); font-weight: 600; }

@@ -10,6 +10,32 @@ export interface SearchGrid {
   cell(row: number, col: number): string
 }
 
+/** What counts as a match, shared by Find and Replace so that they always agree. */
+export interface Matcher {
+  test(value: string): boolean
+  /** The value with every match replaced by `replacement`, used literally. */
+  replace(value: string, replacement: string): string
+}
+
+const escapeRegExp = (text: string) => text.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')
+
+/**
+ * Case-insensitive. Partial by default: the query may appear anywhere in the cell. With `exact` the
+ * whole cell must equal the query, and replacing swaps the whole cell.
+ */
+export function createMatcher(query: string, exact: boolean): Matcher {
+  if (exact) {
+    const needle = query.toLowerCase()
+    const test = (value: string) => value.toLowerCase() === needle
+    return { test, replace: (value, replacement) => (test(value) ? replacement : value) }
+  }
+  const source = escapeRegExp(query)
+  const one = new RegExp(source, 'iu')
+  const every = new RegExp(source, 'giu')
+  // A function as the replacement keeps "$&" and friends from meaning anything.
+  return { test: (value) => one.test(value), replace: (value, replacement) => value.replace(every, () => replacement) }
+}
+
 /**
  * Next cell matching `query`, row by row and left to right (BUS-07), wrapping around (BUS-03).
  * Case-insensitive; partial match unless `exact`, which needs the whole cell to equal the query.
@@ -25,14 +51,34 @@ export function findMatch(
   const { rowCount, colCount } = grid
   const total = rowCount * colCount
   if (total === 0 || query === '') return
-  const needle = query.toLowerCase()
+  const matcher = createMatcher(query, exact)
   const valid = from && from.row < rowCount && from.col < colCount
   const start = valid ? from.row * colCount + from.col + direction : direction === 1 ? 0 : total - 1
   for (let step = 0; step < total; step++) {
     const index = (((start + step * direction) % total) + total) % total
     const row = Math.floor(index / colCount)
     const col = index % colCount
-    const value = grid.cell(row, col).toLowerCase()
-    if (exact ? value === needle : value.includes(needle)) return { row, col }
+    if (matcher.test(grid.cell(row, col))) return { row, col }
   }
+}
+
+/** Every cell that Replace All would change, with its new value. Cells that would stay the same are left out. */
+export function findReplacements(
+  grid: SearchGrid,
+  query: string,
+  exact: boolean,
+  replacement: string,
+): { row: number; col: number; value: string }[] {
+  if (query === '') return []
+  const matcher = createMatcher(query, exact)
+  const changes: { row: number; col: number; value: string }[] = []
+  for (let row = 0; row < grid.rowCount; row++) {
+    for (let col = 0; col < grid.colCount; col++) {
+      const value = grid.cell(row, col)
+      if (!matcher.test(value)) continue
+      const next = matcher.replace(value, replacement)
+      if (next !== value) changes.push({ row, col, value: next })
+    }
+  }
+  return changes
 }

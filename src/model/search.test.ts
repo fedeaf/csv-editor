@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { fillCells, setCell } from './commands'
+import { fillCells, replaceCells, setCell } from './commands'
 import { History } from './history'
-import { findMatch, type SearchGrid } from './search'
+import { createMatcher, findMatch, findReplacements, type SearchGrid } from './search'
 import { Table } from './table'
 import { TableView } from './view'
 
@@ -116,5 +116,116 @@ describe('fillCells', () => {
     const cmd = fillCells(t, [{ rowId: t.order[1]!, col: 2 }], 'x')!
     expect(cmd.invalidates).toEqual([t.colIds[2]])
     expect(setCell(t, t.order[0]!, 0, 'z').invalidates).toEqual([t.colIds[0]])
+  })
+})
+
+describe('createMatcher', () => {
+  it('replaces every occurrence in a cell, ignoring case', () => {
+    const m = createMatcher('ana', false)
+    expect(m.replace('Ana and ANA and banana', 'X')).toBe('X and X and bXna') // matches do not overlap
+    expect(m.test('Mariana')).toBe(true)
+    expect(m.test('Mario')).toBe(false)
+  })
+  it('takes the replacement literally: $ patterns mean nothing', () => {
+    expect(createMatcher('a', false).replace('banana', '$&$1$$')).toBe('b$&$1$$n$&$1$$n$&$1$$')
+  })
+  it('takes the query literally: characters that mean something in a pattern do not', () => {
+    expect(createMatcher('a.b', false).replace('a.b axb', '-')).toBe('- axb')
+    expect(createMatcher('(1+1)', false).replace('x (1+1) y', '2')).toBe('x 2 y')
+    expect(createMatcher('[a-z]*', false).replace('[a-z]* and abc', '?')).toBe('? and abc')
+    expect(createMatcher('\\', false).replace('a\\b', '/')).toBe('a/b')
+    expect(createMatcher('?', false).test('what?')).toBe(true)
+  })
+  it('works with accents and other scripts', () => {
+    expect(createMatcher('ñ', false).replace('Niño y NIÑO', 'n')).toBe('Nino y NInO')
+    expect(createMatcher('é', false).replace('Éric café', 'e')).toBe('eric cafe')
+    expect(createMatcher('日本', false).test('こんにちは日本')).toBe(true)
+  })
+  it('exact: the whole cell must equal the query, and it is swapped whole', () => {
+    const m = createMatcher('ana', true)
+    expect(m.test('ANA')).toBe(true)
+    expect(m.test('Mariana')).toBe(false)
+    expect(m.replace('ANA', 'Eva')).toBe('Eva')
+    expect(m.replace('Mariana', 'Eva')).toBe('Mariana')
+  })
+  it('agrees with Find: a cell that is found can be replaced', () => {
+    const cells = ['Ana', 'MARIANA', 'banana', 'x.y', 'İstanbul', 'straße']
+    for (const query of ['ana', 'a', 'X.Y', 'stanbul', 'ß']) {
+      const m = createMatcher(query, false)
+      for (const cell of cells) {
+        if (m.test(cell)) expect(m.replace(cell, '#')).not.toBe(cell)
+      }
+    }
+  })
+})
+
+describe('findReplacements', () => {
+  const rows = [
+    ['Mariana', 'x', 'ANA'],
+    ['bob', 'ana', 'y'],
+    ['', 'z', 'Anabel'],
+  ]
+  const grid = (): SearchGrid => ({ rowCount: rows.length, colCount: 3, cell: (r, c) => rows[r]![c]! })
+
+  it('lists every cell that changes, with its new text', () => {
+    expect(findReplacements(grid(), 'ana', false, '_')).toEqual([
+      { row: 0, col: 0, value: 'Mari_' },
+      { row: 0, col: 2, value: '_' },
+      { row: 1, col: 1, value: '_' },
+      { row: 2, col: 2, value: '_bel' },
+    ])
+  })
+  it('exact: only whole cells', () => {
+    expect(findReplacements(grid(), 'ana', true, 'Eva')).toEqual([
+      { row: 0, col: 2, value: 'Eva' },
+      { row: 1, col: 1, value: 'Eva' },
+    ])
+  })
+  it('can replace with nothing', () => {
+    expect(findReplacements(grid(), 'ana', false, '')[0]).toEqual({ row: 0, col: 0, value: 'Mari' })
+  })
+  it('leaves out cells that would not change, and an empty query finds nothing', () => {
+    expect(findReplacements(grid(), 'bob', false, 'BOB')).toEqual([{ row: 1, col: 0, value: 'BOB' }])
+    expect(findReplacements(grid(), 'bob', false, 'bob')).toEqual([{ row: 1, col: 0, value: 'bob' }].slice(1))
+    expect(findReplacements(grid(), '', false, 'x')).toEqual([])
+  })
+})
+
+describe('replaceCells', () => {
+  const make = () => new Table(['a', 'b'], [['ana', 'x'], ['bob', 'ana'], ['eve', 'y']])
+  const cells = (t: Table) => [...t.orderedCells()].map((r) => [...r])
+
+  it('changes many cells as one undo step', () => {
+    const t = make()
+    const h = new History()
+    const changes = [
+      { rowId: t.order[0]!, col: 0, value: 'EVA' },
+      { rowId: t.order[1]!, col: 1, value: 'EVA' },
+    ]
+    h.execute(replaceCells(t, changes)!, t)
+    expect(cells(t)).toEqual([['EVA', 'x'], ['bob', 'EVA'], ['eve', 'y']])
+    h.undo(t)
+    expect(cells(t)).toEqual([['ana', 'x'], ['bob', 'ana'], ['eve', 'y']])
+    expect(h.canUndo).toBe(false)
+    h.redo(t)
+    expect(cells(t)[0]![0]).toBe('EVA')
+  })
+  it('does nothing when no cell would change', () => {
+    const t = make()
+    expect(replaceCells(t, [{ rowId: t.order[0]!, col: 0, value: 'ana' }])).toBeUndefined()
+    expect(replaceCells(t, [])).toBeUndefined()
+  })
+  it('reports the columns whose duplicates may change', () => {
+    const t = make()
+    expect(replaceCells(t, [{ rowId: t.order[0]!, col: 1, value: 'q' }])!.invalidates).toEqual([t.colIds[1]])
+  })
+  it('under a filter, Replace All only touches the rows shown', () => {
+    const t = new Table(['k', 'v'], [['a', 'ana'], ['b', 'ana'], ['a', 'ana']])
+    const view = new TableView(t)
+    view.setFilter(t.colIds[0]!, { selected: new Set(['a']), duplicatesOnly: false })
+    const shown: SearchGrid = { rowCount: view.rowCount, colCount: 2, cell: (r, c) => t.rowById(view.visible[r]!)!.cells[c]! }
+    const changes = findReplacements(shown, 'ana', false, 'EVA').map((c) => ({ rowId: view.visible[c.row]!, col: c.col, value: c.value }))
+    replaceCells(t, changes)!.run(t)
+    expect([...t.orderedCells()].map((r) => r[1])).toEqual(['EVA', 'ana', 'EVA']) // the hidden row keeps its text
   })
 })

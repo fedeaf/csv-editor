@@ -27,7 +27,7 @@ undo, redo and Find only act on the tab in focus.
 | **Sort** | ▲ and ▼ on every header. Whole rows move. Case-insensitive, English collation, blanks last, stable. Numbers are plain text, so `10` sorts before `9`. |
 | **Filters** | The funnel on every header opens the AutoFilter: unique values with checkboxes, *Select All*, *(Blanks)*, a search box and *Duplicates only*. Filters on several columns combine. Filtering hides rows, it never deletes them, and saving writes every row. |
 | **Duplicates** | Each header shows **DUP** when its column has repeated values, or a ✓ when it does not, as soon as the file opens. Click **DUP** to show only the duplicates of that column. Duplicates are exact matches, sensitive to case and spaces; blank cells never count. |
-| **Find** | `Ctrl+F` opens a floating panel. Case-insensitive, partial match by default, with an *entire cell* option. It searches the rows shown, row by row, and wraps around. |
+| **Find and replace** | `Ctrl+F` opens a floating panel. Case-insensitive, partial match by default, with an *entire cell* option. It searches the rows shown, row by row, and wraps around. A second row of the same panel is for replacing: **Replace** changes the selected match (every occurrence in that cell) and moves to the next one, and **Replace all** changes every match in the rows shown as one undo step. There is no separate shortcut for it. |
 | **Fill** | Drag the handle at the corner of the selected cell, or double-click it to copy the value down the whole column. Values are copied as they are, with no series. With a filter active, only the rows shown change. |
 | **Columns** | Drag the right edge of a header to resize its column, or double-click the edge to fit the column to its longest cells and its header. Widths are kept per document and are not saved in the file. |
 | **Theme** | A light and a dark look. The editor follows the system setting (`prefers-color-scheme`), so there is no switch inside the page. |
@@ -41,7 +41,7 @@ undo, redo and Find only act on the tab in focus.
 | --- | --- |
 | `Ctrl+S` | Save the tab in focus |
 | `Ctrl+Z`, `Ctrl+Y` | Undo, redo (`Ctrl+Shift+Z` also redoes) |
-| `Ctrl+F`, `Ctrl+G` | Find; next match (`Shift+Ctrl+G` for the previous one) |
+| `Ctrl+F`, `Ctrl+G` | Find (and replace, from the same panel); next match (`Shift+Ctrl+G` for the previous one) |
 | Arrows, `Tab`, `Enter` | Move (`Shift+Tab` and `Shift+Enter` move back) |
 | `Ctrl` + arrow | Jump to the first or last row or column |
 | `Shift` + arrow | Extend the selection by one cell |

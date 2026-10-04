@@ -216,3 +216,25 @@ export function pasteCells(table: Table, rowIds: number[], col0: number, block: 
     },
   }
 }
+
+/**
+ * Gives each listed cell its own new value as a single step: what Replace All does. Cells that would
+ * not change are skipped; returns undefined if nothing would.
+ */
+export function replaceCells(table: Table, cells: { rowId: number; col: number; value: string }[]): Command | undefined {
+  const changes = cells
+    .map((c) => ({ ...c, before: table.rowById(c.rowId)!.cells[c.col]! }))
+    .filter((c) => c.before !== c.value)
+  if (changes.length === 0) return undefined
+  const columns = [...new Set(changes.map((c) => table.colIds[c.col]!))]
+  return {
+    label: 'Replace',
+    invalidates: columns,
+    run: (t) => {
+      for (const c of changes) t.rowById(c.rowId)!.cells[c.col] = c.value
+    },
+    revert: (t) => {
+      for (const c of changes) t.rowById(c.rowId)!.cells[c.col] = c.before
+    },
+  }
+}
