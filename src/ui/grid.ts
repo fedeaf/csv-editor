@@ -52,6 +52,8 @@ export interface GridState {
 
 export interface GridHandlers {
   onFill(fill: FillRequest): void
+  /** The selection moved, grew or shrank. */
+  onSelectionChange(): void
   /** A column was dragged (or fitted) to a new width: the owner keeps it. */
   onColumnResize(col: number, width: number): void
   /** Delete or Backspace over the selection. */
@@ -709,6 +711,7 @@ export class Grid {
     for (const [index, node] of this.rendered) this.paintRow(node, index)
     this.paintHeader()
     this.placeFillHandle()
+    this.handlers.onSelectionChange()
   }
 
   // --- fill handle (REL-01 to REL-03) -------------------------------------------------------

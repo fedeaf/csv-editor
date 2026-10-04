@@ -82,7 +82,12 @@ body { display: flex; flex-direction: column; background: var(--surface); }
 .header-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-number { position: sticky; left: 0; z-index: 2; width: var(--row-number-width, 72px); text-align: right; color: var(--ink-muted); background: var(--chrome); border-right: 1px solid var(--line); }
 
-#status { padding: 3px 10px; color: var(--ink-muted); background: var(--chrome); border-top: 1px solid var(--line); min-height: 24px; }
+/* Status bar: what is going on on the left (the selection, or the result of the last action), the file on the right */
+#status { display: flex; align-items: baseline; gap: 16px; padding: 3px 10px; color: var(--ink-muted); background: var(--chrome); border-top: 1px solid var(--line); min-height: 24px; }
+#status-activity { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status-activity.message { color: var(--ink); font-weight: 600; }
+#status-activity.message:not(.neutral)::before { content: '✓ '; color: var(--ok); }
+#status-info { flex: none; margin-left: auto; white-space: nowrap; }
 
 /* Menus */
 .popup-menu { margin: 0; padding: 4px 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-popup); }

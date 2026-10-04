@@ -11,6 +11,7 @@ import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
 import { Grid, type FillRequest, type GridModel, type GridState, type Rect } from './ui/grid'
 import { confirmDialog, isDialogOpen, messageDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
+import { fileInfo, plural, selectionSummary } from './ui/status'
 import { createTabBar, tabAfterClose } from './ui/tabBar'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -51,6 +52,10 @@ const grid = new Grid($('grid-host'), {
   onFill: fill,
   onClear: (rect) => clearCells(rect),
   onColumnResize: (col, width) => current?.view.widths.set(current.doc.table.colIds[col]!, width),
+  onSelectionChange: () => {
+    setStatusMessage(undefined) // the selection took over from the last message
+    showActivity()
+  },
 })
 
 const tabBar = createTabBar($('tabs'), {
@@ -163,8 +168,36 @@ async function findOpenTab(doc: CsvDocument): Promise<Tab | undefined> {
 
 // --- document and history ---------------------------------------------------------------
 
-/** Tab strip, window title, status line and menu state, all for the tab in focus. */
-function showMeta(message?: string): void {
+/** The last action's result, shown on the left of the status bar for a few seconds. */
+let statusMessage: { text: string; neutral: boolean } | undefined
+let statusTimer: number | undefined
+const MESSAGE_SECONDS = 4
+
+function setStatusMessage(text: string | undefined, neutral = false): void {
+  window.clearTimeout(statusTimer)
+  statusMessage = text === undefined ? undefined : { text, neutral }
+  if (text !== undefined) {
+    statusTimer = window.setTimeout(() => {
+      statusMessage = undefined
+      showActivity()
+    }, MESSAGE_SECONDS * 1000)
+  }
+}
+
+/** Left side of the status bar: the message of the last action while it lasts, else the selection. */
+function showActivity(): void {
+  const activity = $('status-activity')
+  const text = statusMessage?.text ?? (current ? selectionSummary(grid.selection(), current.view.rowCount) : '')
+  activity.textContent = text
+  activity.classList.toggle('message', !!statusMessage)
+  activity.classList.toggle('neutral', !!statusMessage?.neutral)
+}
+
+/**
+ * Tab strip, window title, status bar and menu state, all for the tab in focus. A `message` is the
+ * result of an action ("Saved", "Pasted"); without one, any earlier message is cleared.
+ */
+function showMeta(message?: string, neutral = false): void {
   tabBar.render(tabs.map((t) => ({ id: t.id, label: t.doc.name, dirty: t.history.dirty, active: t === current })))
   const tab = current
   const mark = tab?.history.dirty ? '* ' : ''
@@ -176,19 +209,16 @@ function showMeta(message?: string): void {
   item('save-as').classList.toggle('disabled', !tab)
   item('find').classList.toggle('disabled', !tab)
   item('clear-filters').classList.toggle('disabled', !tab?.view.filtered)
-  if (!tab) {
-    $('status').textContent = ''
-    return
-  }
-  const { format, table } = tab.doc
-  const encoding = format.encoding === 'utf-8' ? (format.bom ? 'UTF-8 with BOM' : 'UTF-8') : 'Windows-1252 / ISO-8859-1'
-  const delimiter = format.delimiter === ',' ? 'comma' : 'semicolon'
-  const count = (n: number) => n.toLocaleString('en-US')
-  const rows = tab.view.filtered
-    ? `Showing ${count(tab.view.rowCount)} of ${count(table.rowCount)} rows`
-    : `${count(table.rowCount)} rows`
-  const info = `${rows} × ${table.columnCount} columns · ${encoding} · ${delimiter}-delimited`
-  $('status').textContent = message ? `${message} · ${info}` : info
+  setStatusMessage(message, neutral)
+  showActivity()
+  $('status-info').textContent = tab
+    ? fileInfo({
+        rows: tab.doc.table.rowCount,
+        rowsShown: tab.view.filtered ? tab.view.rowCount : undefined,
+        columns: tab.doc.table.columnCount,
+        format: tab.doc.format,
+      })
+    : ''
 }
 
 /** After a command ran, was undone or redone: refresh statistics, filters and grid, then place the cursor. */
@@ -261,7 +291,6 @@ function clearCells(rect: Rect): void {
   if (command) run(command)
 }
 
-const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`
 const isTextField = (target: EventTarget | null) =>
   target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
 
@@ -310,7 +339,7 @@ function pasteClipboard(e: ClipboardEvent): void {
   }
   const command = pasteCells(table, tab.view.visible.slice(rect.r0, rect.r0 + height), rect.c0, block)
   if (!command) {
-    showMeta('Pasted: nothing changed')
+    showMeta('Nothing changed', true)
     return
   }
   run(command)

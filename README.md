@@ -30,6 +30,7 @@ undo, redo and Find only act on the tab in focus.
 | **Find** | `Ctrl+F` opens a floating panel. Case-insensitive, partial match by default, with an *entire cell* option. It searches the rows shown, row by row, and wraps around. |
 | **Fill** | Drag the handle at the corner of the selected cell, or double-click it to copy the value down the whole column. Values are copied as they are, with no series. With a filter active, only the rows shown change. |
 | **Columns** | Drag the right edge of a header to resize its column, or double-click the edge to fit the column to its longest cells and its header. Widths are kept per document and are not saved in the file. |
+| **Status bar** | The left side shows the size of the selection ("Selected 3 rows × 2 columns (6 cells)") or, for a few seconds, the result of the last action ("✓ Saved", "✓ Pasted"). The right side describes the file: rows, columns, encoding and delimiter, and how many rows a filter leaves visible. |
 | **Selection** | Select blocks by dragging, or with `Shift` and the arrows. Click a row number or a header to select the whole row or column. |
 | **Copy and paste** | `Ctrl+C`, `Ctrl+X` and `Ctrl+V` on a cell, a block, a row or a column. The clipboard format is the tab-separated text that Excel and Google Sheets use. See below. |
 
