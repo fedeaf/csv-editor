@@ -290,6 +290,8 @@ Each colour is written once with its two values, light and dark (`light-dark()`)
 
 Selection style: the cells of a block are tinted and the block is outlined along its outer edge. The active cell, where typing goes, is white with its own outline. The row numbers and headers the block covers are shaded, and a whole selected column has a darker header.
 
+Header controls: every header carries the same controls, all always in view. From left to right: the warning for spreadsheet errors (only when it applies, ahead of the name), the duplicates indicator, the sort control and the filter. The icons share one style and size. The two sort directions are one control, an up arrow over a down arrow, each half a target of its own; the active direction takes the accent colour. The duplicates indicator is a tag that stands out when there are duplicates and a quiet check mark when there are none, so that the exception is what catches the eye. At rest the icons are drawn quietly; they firm up under the pointer, and an active one (a sorted direction, a filtered column) takes the accent colour.
+
 ## Beyond the original scope
 
 Added after the MVP was specified:

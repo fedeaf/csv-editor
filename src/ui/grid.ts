@@ -693,23 +693,30 @@ export class Grid {
       warning.setAttribute('aria-label', warning.title)
       warning.innerHTML = WARNING
     }
-    const dup = button('dup', info.duplicateValues > 0 ? 'dup' : '✓')
+    // Duplicates: a tag that stands out while there are some, a quiet check mark when there are none.
+    const dup = button('dup', info.duplicateValues > 0 ? 'dup' : '')
+    if (info.duplicateValues === 0) dup.innerHTML = CHECK
     dup.classList.add(info.duplicateValues > 0 ? 'has' : 'none')
     dup.title =
       info.duplicateValues > 0
         ? `${info.duplicateValues} value(s) repeat, in ${info.duplicateRows} rows. Click to show only duplicates.`
         : 'No duplicate values in this column.'
-    const asc = button('sort-asc', '▲', 'Sort ascending')
-    const desc = button('sort-desc', '▼', 'Sort descending')
+    // The two sort directions are one control, an up arrow over a down arrow; both stay in view.
+    const asc = button('sort-asc', '', 'Sort ascending')
+    const desc = button('sort-desc', '', 'Sort descending')
+    asc.innerHTML = ARROW_UP
+    desc.innerHTML = ARROW_DOWN
     asc.classList.toggle('active', info.sort === 'asc')
     desc.classList.toggle('active', info.sort === 'desc')
+    const sort = el('span', 'hsort')
+    sort.append(asc, desc)
     const filter = button('filter', '', info.filtered ? 'Filter (active)' : 'Filter')
     filter.innerHTML = FUNNEL
     filter.classList.toggle('active', info.filtered)
     const resizer = el('div', 'col-resizer')
     resizer.dataset.role = 'resize'
     resizer.title = 'Drag to resize. Double-click to fit the content.'
-    node.append(...(warning ? [warning] : []), text, dup, asc, desc, filter, resizer)
+    node.append(...(warning ? [warning] : []), text, dup, sort, filter, resizer)
     return node
   }
 
@@ -922,7 +929,7 @@ export class Grid {
       for (let r = 0; r < model!.rowCount; r++) yield model!.cells(r)[col] ?? ''
     }
     // Measuring every cell of a large file would be slow; the longest few decide the width.
-    const warningRoom = model.column(col).errorCells > 0 ? 18 : 0
+    const warningRoom = model.column(col).errorCells > 0 ? 22 : 0
     this.setWidth(col, fitWidth(longestStrings(column(), 40), model.headers[col] ?? '', measure, 18, 110 + warningRoom))
     this.handlers.onColumnResize(col, this.colWidth(col))
   }
@@ -1035,6 +1042,13 @@ function el(tag: string, className: string): HTMLElement {
 
 const WARNING =
   '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v4" stroke="var(--chrome)" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.9" r="0.95" fill="var(--chrome)"/></svg>'
+
+const ARROW_UP =
+  '<svg viewBox="0 0 8 8" width="8" height="8" aria-hidden="true"><path d="M4 1.2 7.6 6.6H.4z" fill="currentColor"/></svg>'
+const ARROW_DOWN =
+  '<svg viewBox="0 0 8 8" width="8" height="8" aria-hidden="true"><path d="M4 6.8 7.6 1.4H.4z" fill="currentColor"/></svg>'
+const CHECK =
+  '<svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 6.4 4.8 9 10 3.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
 const FUNNEL =
   '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M1 2h10L7 6.5V10L5 11V6.5z" fill="currentColor"/></svg>'

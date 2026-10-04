@@ -55,7 +55,7 @@ describe('fitting a column to its content', () => {
     expect(fitWidth(['x'.repeat(40), 'y'.repeat(10)], 'id', measure)).toBe(40 * 8 + 18)
   })
   it('leaves room for the header controls when the header is the widest', () => {
-    expect(fitWidth(['a'], 'a long header name', measure)).toBe(18 * 9 + 110)
+    expect(fitWidth(['a'], 'a long header name', measure)).toBe(18 * 9 + 100)
   })
   it('never goes below the minimum or above the maximum', () => {
     expect(fitWidth([], '', measure)).toBe(MIN_COLUMN_WIDTH)

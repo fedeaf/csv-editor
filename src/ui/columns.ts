@@ -2,7 +2,7 @@
 // arithmetic so the grid can find a column from a position without assuming they are all alike.
 
 export const DEFAULT_COLUMN_WIDTH = 200
-/** Wide enough for the header's controls (duplicates, sort arrows and filter) plus a few letters. */
+/** Wide enough for the header's controls (duplicates, sort and filter) plus a few letters of the name. */
 export const MIN_COLUMN_WIDTH = 120
 export const MAX_COLUMN_WIDTH = 1200
 
@@ -53,7 +53,7 @@ export function fitWidth(
   header: string,
   measure: (text: string, bold: boolean) => number,
   cellPadding = 18,
-  headerControls = 110,
+  headerControls = 100, // padding, the duplicates tag, the sort control and the filter, and the gaps between them
 ): number {
   const cells = longestCells.reduce((w, s) => Math.max(w, measure(s, false)), 0) + cellPadding
   const head = measure(header, true) + headerControls
