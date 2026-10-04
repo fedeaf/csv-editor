@@ -7,6 +7,7 @@ import { findMatch, type Position } from './model/search'
 import { TableView, uniqueValues, type ColumnFilter } from './model/view'
 import { closeContextMenu, showContextMenu } from './ui/contextMenu'
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
+import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
 import { Grid, type FillRequest, type GridModel, type GridState, type Rect } from './ui/grid'
 import { createSearchPanel } from './ui/searchPanel'
 import { createTabBar, tabAfterClose } from './ui/tabBar'
@@ -48,6 +49,7 @@ const grid = new Grid($('grid-host'), {
   onDuplicates: toggleDuplicates,
   onFill: fill,
   onClear: (rect) => clearCells(rect),
+  onColumnResize: (col, width) => current?.view.widths.set(current.doc.table.colIds[col]!, width),
 })
 
 const tabBar = createTabBar($('tabs'), {
@@ -67,6 +69,7 @@ function modelFor(v: TableView): GridModel {
     },
     cells: (row) => table.rowById(v.visible[row]!)!.cells,
     rowNumber: (row) => v.rowNumber(row),
+    columnWidth: (col) => v.widths.get(table.colIds[col]!) ?? DEFAULT_COLUMN_WIDTH,
     column: (col) => {
       const colId = table.colIds[col]!
       const stat = v.stats.get(colId)

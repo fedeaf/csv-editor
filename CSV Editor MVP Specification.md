@@ -299,6 +299,7 @@ Added after the MVP was specified:
 - **Ctrl and the arrows** jump to the first or last row or column.
 - **Copy, cut and paste** of cells, blocks, rows and columns, as the tab-separated text that Excel and Google Sheets use. A single value pasted over a selection fills it. Lines that do not fit become new rows and a block that is too wide adds columns, so nothing is dropped.
 - **Delete** empties the selected cells.
+- **Resizable columns.** Drag the edge of a header to resize a column, between 120 and 1200 pixels; double-click it to fit the content. The minimum leaves room for the header's controls. Widths belong to the view: they are kept per tab, are not part of the history and are not saved in the file.
 
 ## Verification
 

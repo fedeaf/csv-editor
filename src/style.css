@@ -68,14 +68,14 @@ body { display: flex; flex-direction: column; background: var(--surface); }
 #empty[hidden] { display: none; }
 
 .grid-scroller { position: absolute; inset: 0; overflow: auto; }
-.grid-header { position: sticky; top: 0; z-index: 3; display: flex; background: var(--chrome); border-bottom: 1px solid var(--line); }
+.grid-header { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: var(--grid-cols); background: var(--chrome); border-bottom: 1px solid var(--line); }
 .grid-body { position: relative; }
-.grid-row { position: absolute; left: 0; right: 0; display: flex; border-bottom: 1px solid var(--line-soft); }
+.grid-row { position: absolute; left: 0; right: 0; display: grid; grid-template-columns: var(--grid-cols); border-bottom: 1px solid var(--line-soft); }
 .grid-row.alt { background: var(--surface-alt); }
 
 .row-number, .header-cell, .cell { flex: none; padding: 0 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 25px; }
-.header-cell, .cell { width: var(--col-width, 200px); border-right: 1px solid var(--line-soft); }
-.header-cell { display: flex; align-items: center; gap: 2px; padding-right: 4px; font-weight: 600; line-height: 27px; border-right-color: var(--line); text-overflow: clip; }
+.header-cell, .cell { border-right: 1px solid var(--line-soft); }
+.header-cell { position: relative; display: flex; align-items: center; gap: 2px; padding-right: 7px; font-weight: 600; line-height: 27px; border-right-color: var(--line); text-overflow: clip; }
 .header-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-number { position: sticky; left: 0; z-index: 2; width: var(--row-number-width, 72px); text-align: right; color: var(--ink-muted); background: var(--chrome); border-right: 1px solid var(--line); }
 
@@ -177,3 +177,8 @@ body.find-open #tabs { margin-right: calc(var(--find-width) + 12px); }
 .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab-close { flex: none; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--ink-subtle); font-size: 15px; line-height: 1; cursor: pointer; }
 .tab-close:hover { background: var(--chrome-hover); color: var(--ink); }
+
+/* Column resize handle: the right edge of a header */
+.col-resizer { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; cursor: col-resize; }
+.col-resizer:hover { background: var(--accent); opacity: 0.45; }
+body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }

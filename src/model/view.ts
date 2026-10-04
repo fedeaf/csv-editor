@@ -67,6 +67,8 @@ export class ColumnStats {
 export class TableView {
   readonly stats: ColumnStats
   readonly filters = new Map<number, ColumnFilter>()
+  /** Column widths the user set, by column id. Part of the view: not saved and not in the history. */
+  readonly widths = new Map<number, number>()
   /** Row ids in display order. */
   visible: number[]
   /** Position in the whole table (1-based) of each visible row; undefined when nothing is filtered. */

@@ -1,7 +1,8 @@
+import { clampWidth, columnAt, columnOffsets, fitWidth, longestStrings } from './columns'
+
 const ROW_HEIGHT = 26
 const HEADER_HEIGHT = 28
 const ROW_NUMBER_WIDTH = 72
-const COLUMN_WIDTH = 200
 const BUFFER_ROWS = 10
 const EDITOR_LINE_HEIGHT = 18
 
@@ -13,6 +14,8 @@ export interface GridModel {
   /** Number shown for the row: its position in the whole table, so filtering leaves gaps. */
   rowNumber(row: number): number
   column(col: number): ColumnInfo
+  /** Width in pixels of a column, as the user left it. */
+  columnWidth(col: number): number
 }
 
 export interface ColumnInfo {
@@ -49,6 +52,8 @@ export interface GridState {
 
 export interface GridHandlers {
   onFill(fill: FillRequest): void
+  /** A column was dragged (or fitted) to a new width: the owner keeps it. */
+  onColumnResize(col: number, width: number): void
   /** Delete or Backspace over the selection. */
   onClear(rect: Rect): void
   onSort(col: number, dir: 'asc' | 'desc'): void
@@ -94,6 +99,9 @@ export class Grid {
   private body: HTMLElement
   private model: GridModel | undefined
   private rendered = new Map<number, HTMLElement>()
+  /** Width of each column, and the left edge of each (counted from the first column) with the total last. */
+  private widths: number[] = []
+  private offsets: number[] = [0]
   private frame = 0
   private active = { row: 0, col: 0 }
   /** The other corner of a cell selection: the block runs from `active` to `extent`. */
@@ -135,7 +143,6 @@ export class Grid {
     this.scroller.append(this.header, this.body)
     host.append(this.scroller)
 
-    host.style.setProperty('--col-width', `${COLUMN_WIDTH}px`)
     host.style.setProperty('--row-number-width', `${ROW_NUMBER_WIDTH}px`)
     this.header.addEventListener('click', (e) => this.onHeaderClick(e))
     this.scroller.addEventListener('scroll', () => this.scheduleRender())
@@ -175,10 +182,10 @@ export class Grid {
     for (const node of this.rendered.values()) node.remove()
     this.rendered.clear()
     this.header.replaceChildren()
+    this.widths = model ? model.headers.map((_, c) => clampWidth(model.columnWidth(c))) : []
+    this.layoutColumns()
     if (model) {
       const columns = model.headers.length
-      const width = ROW_NUMBER_WIDTH + columns * COLUMN_WIDTH
-      this.header.style.width = this.body.style.width = `${width}px`
       this.header.style.height = `${HEADER_HEIGHT}px`
       this.body.style.height = `${model.rowCount * ROW_HEIGHT}px`
       this.header.append(cell('row-number', ''))
@@ -195,6 +202,29 @@ export class Grid {
     this.paintHeader()
     this.placeFillHandle()
     this.scheduleRender()
+  }
+
+  /** Applies the column widths: one template shared by the header and every row. */
+  private layoutColumns(): void {
+    this.offsets = columnOffsets(this.widths)
+    const total = ROW_NUMBER_WIDTH + this.offsets[this.offsets.length - 1]!
+    this.header.style.width = this.body.style.width = `${total}px`
+    this.scroller.style.setProperty('--grid-cols', `${ROW_NUMBER_WIDTH}px ${this.widths.map((w) => `${w}px`).join(' ')}`)
+  }
+
+  private colLeft(col: number): number {
+    return ROW_NUMBER_WIDTH + (this.offsets[col] ?? 0)
+  }
+
+  private colWidth(col: number): number {
+    return this.widths[col] ?? 0
+  }
+
+  /** The column at a horizontal position counted from the left of the grid content; -1 outside the columns. */
+  private colAtX(x: number): number {
+    const gx = x - ROW_NUMBER_WIDTH
+    if (gx < 0 || gx >= this.offsets[this.offsets.length - 1]!) return -1
+    return columnAt(this.offsets, gx)
   }
 
   /** The active cell, as display row and column. */
@@ -274,7 +304,8 @@ export class Grid {
     const original = model.headers[col]!
     const input = this.createEditor(original)
     input.style.top = '0'
-    input.style.left = `${ROW_NUMBER_WIDTH + col * COLUMN_WIDTH}px`
+    input.style.left = `${this.colLeft(col)}px`
+    input.style.width = `${this.colWidth(col)}px`
     input.style.height = `${HEADER_HEIGHT}px`
     this.header.append(input)
     this.editing = { kind: 'header', row: 0, col, original, input }
@@ -297,7 +328,8 @@ export class Grid {
     const original = model.cells(row)[col]!
     const input = this.createEditor(replace ? '' : original)
     input.style.top = `${row * ROW_HEIGHT}px`
-    input.style.left = `${ROW_NUMBER_WIDTH + col * COLUMN_WIDTH}px`
+    input.style.left = `${this.colLeft(col)}px`
+    input.style.width = `${this.colWidth(col)}px`
     this.body.append(input)
     this.editing = { kind: 'cell', row, col, original, input }
     this.placeFillHandle()
@@ -311,7 +343,6 @@ export class Grid {
     input.wrap = 'off'
     input.spellcheck = false
     input.value = value
-    input.style.width = `${COLUMN_WIDTH}px`
     input.addEventListener('keydown', (e) => this.onEditorKeyDown(e))
     input.addEventListener('input', () => this.fitEditor(input))
     input.addEventListener('blur', () => this.finishEdit(true))
@@ -502,21 +533,23 @@ export class Grid {
     const y = e.clientY - box.top
     if (x >= this.scroller.clientWidth || y >= this.scroller.clientHeight) return // scrollbars
     const inRowNumber = x < ROW_NUMBER_WIDTH
-    const col = Math.floor((x + this.scroller.scrollLeft - ROW_NUMBER_WIDTH) / COLUMN_WIDTH)
+    const col = this.colAtX(x + this.scroller.scrollLeft)
     if (y < HEADER_HEIGHT) {
       if (inRowNumber) return { zone: 'corner' }
-      return col < model.headers.length ? { zone: 'header', col } : undefined
+      return col >= 0 ? { zone: 'header', col } : undefined
     }
     const row = Math.floor((y + this.scroller.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT)
     if (row >= model.rowCount) return
     if (inRowNumber) return { zone: 'rowNumber', row }
-    return col < model.headers.length ? { zone: 'cell', row, col } : undefined
+    return col >= 0 ? { zone: 'cell', row, col } : undefined
   }
 
   private onMouseDown(e: MouseEvent): void {
     if (e.button !== 0 || e.target === this.editing?.input) return
     if (e.target === this.fillHandle) return this.startFill(e)
     this.commitEdit()
+    const resizer = (e.target as Element).closest<HTMLElement>('[data-role=resize]')
+    if (resizer) return this.startResize(e, Number(resizer.closest<HTMLElement>('.header-cell')!.dataset.col))
     if ((e.target as Element).closest('[data-role]')) return // header buttons act on click
     const hit = this.hit(e)
     if (!hit) return
@@ -553,6 +586,8 @@ export class Grid {
 
   private onDoubleClick(e: MouseEvent): void {
     if (e.target === this.fillHandle) return this.fillDown()
+    const resizer = (e.target as Element).closest<HTMLElement>('[data-role=resize]')
+    if (resizer) return this.fitColumn(Number(resizer.closest<HTMLElement>('.header-cell')!.dataset.col))
     if ((e.target as Element).closest('[data-role]')) return
     const hit = this.hit(e)
     if (hit?.zone === 'cell') this.startCellEdit(false)
@@ -597,9 +632,10 @@ export class Grid {
     if (top < s.scrollTop) s.scrollTop = top
     else if (top + ROW_HEIGHT > s.scrollTop + viewHeight) s.scrollTop = top + ROW_HEIGHT - viewHeight
     const viewWidth = s.clientWidth - ROW_NUMBER_WIDTH
-    const left = col * COLUMN_WIDTH
+    const left = this.offsets[col] ?? 0
+    const width = this.colWidth(col)
     if (left < s.scrollLeft) s.scrollLeft = left
-    else if (left + COLUMN_WIDTH > s.scrollLeft + viewWidth) s.scrollLeft = left + COLUMN_WIDTH - viewWidth
+    else if (left + width > s.scrollLeft + viewWidth) s.scrollLeft = left + width - viewWidth
   }
 
   // --- rendering --------------------------------------------------------------------------
@@ -652,7 +688,10 @@ export class Grid {
     const filter = button('filter', '', info.filtered ? 'Filter (active)' : 'Filter')
     filter.innerHTML = FUNNEL
     filter.classList.toggle('active', info.filtered)
-    node.append(text, dup, asc, desc, filter)
+    const resizer = el('div', 'col-resizer')
+    resizer.dataset.role = 'resize'
+    resizer.title = 'Drag to resize. Double-click to fit the content.'
+    node.append(text, dup, asc, desc, filter, resizer)
     return node
   }
 
@@ -681,7 +720,7 @@ export class Grid {
     const show = !!model && model.rowCount > 0 && model.headers.length > 0 && !this.editing && single
     this.fillHandle.hidden = !show
     if (!show) return
-    this.fillHandle.style.left = `${ROW_NUMBER_WIDTH + (this.active.col + 1) * COLUMN_WIDTH - 6}px`
+    this.fillHandle.style.left = `${this.colLeft(this.active.col) + this.colWidth(this.active.col) - 6}px`
     this.fillHandle.style.top = `${(this.active.row + 1) * ROW_HEIGHT - 6}px`
   }
 
@@ -754,7 +793,7 @@ export class Grid {
       }
     }
 
-    const col = clamp(Math.floor((d.x - box.left + s.scrollLeft - ROW_NUMBER_WIDTH) / COLUMN_WIDTH), model.headers.length - 1)
+    const col = columnAt(this.offsets, d.x - box.left + s.scrollLeft - ROW_NUMBER_WIDTH)
     const row = clamp(Math.floor((d.y - box.top + s.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT), model.rowCount - 1)
     d.target = horizontal ? { row: d.row, col } : { row, col: d.col }
 
@@ -768,8 +807,8 @@ export class Grid {
       Object.assign(this.fillPreview.style, {
         top: `${r0 * ROW_HEIGHT}px`,
         height: `${(r1 - r0 + 1) * ROW_HEIGHT}px`,
-        left: `${ROW_NUMBER_WIDTH + c0 * COLUMN_WIDTH}px`,
-        width: `${(c1 - c0 + 1) * COLUMN_WIDTH}px`,
+        left: `${this.colLeft(c0)}px`,
+        width: `${this.colLeft(c1) + this.colWidth(c1) - this.colLeft(c0)}px`,
       })
     }
     d.frame = requestAnimationFrame(() => this.dragFrame())
@@ -825,6 +864,49 @@ export class Grid {
     }
   }
 
+  // --- column widths ------------------------------------------------------------------------
+
+  private setWidth(col: number, width: number): void {
+    this.widths[col] = clampWidth(width)
+    this.layoutColumns()
+    this.placeFillHandle()
+  }
+
+  /** Dragging the edge of a header resizes its column live; the width is kept when the button is released. */
+  private startResize(e: MouseEvent, col: number): void {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = this.colWidth(col)
+    const move = (ev: MouseEvent) => this.setWidth(col, startWidth + ev.clientX - startX)
+    const up = () => {
+      document.removeEventListener('mousemove', move)
+      document.removeEventListener('mouseup', up)
+      document.body.classList.remove('resizing')
+      this.handlers.onColumnResize(col, this.colWidth(col))
+    }
+    document.body.classList.add('resizing')
+    document.addEventListener('mousemove', move)
+    document.addEventListener('mouseup', up)
+  }
+
+  /** Double-clicking the edge fits the column to its longest cells and its header. */
+  private fitColumn(col: number): void {
+    const model = this.model
+    if (!model) return
+    const context = document.createElement('canvas').getContext('2d')!
+    const style = getComputedStyle(this.scroller)
+    const measure = (text: string, bold: boolean) => {
+      context.font = `${bold ? 600 : 400} ${style.fontSize} ${style.fontFamily}`
+      return context.measureText(text).width
+    }
+    function* column(): Generator<string> {
+      for (let r = 0; r < model!.rowCount; r++) yield model!.cells(r)[col] ?? ''
+    }
+    // Measuring every cell of a large file would be slow; the longest few decide the width.
+    this.setWidth(col, fitWidth(longestStrings(column(), 40), model.headers[col] ?? '', measure))
+    this.handlers.onColumnResize(col, this.colWidth(col))
+  }
+
   // --- selecting by dragging ----------------------------------------------------------------
 
   /** The cell under a viewport point, clamped to the table: dragging past an edge keeps selecting. */
@@ -834,7 +916,7 @@ export class Grid {
     const box = s.getBoundingClientRect()
     return {
       row: clamp(Math.floor((clientY - box.top + s.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT), model.rowCount - 1),
-      col: clamp(Math.floor((clientX - box.left + s.scrollLeft - ROW_NUMBER_WIDTH) / COLUMN_WIDTH), model.headers.length - 1),
+      col: columnAt(this.offsets, clientX - box.left + s.scrollLeft - ROW_NUMBER_WIDTH),
     }
   }
 
