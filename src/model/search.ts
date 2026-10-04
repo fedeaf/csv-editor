@@ -82,3 +82,33 @@ export function findReplacements(
   }
   return changes
 }
+
+/**
+ * Every cell that matches, as its place in reading order (row by row, left to right): row * columns + column.
+ * The list is in ascending order, so a match's number is found by binary search.
+ */
+export function findAllMatches(grid: SearchGrid, query: string, exact: boolean): number[] {
+  if (query === '' || grid.rowCount === 0 || grid.colCount === 0) return []
+  const matcher = createMatcher(query, exact)
+  const matches: number[] = []
+  for (let row = 0; row < grid.rowCount; row++) {
+    for (let col = 0; col < grid.colCount; col++) {
+      if (matcher.test(grid.cell(row, col))) matches.push(row * grid.colCount + col)
+    }
+  }
+  return matches
+}
+
+/** The number, counting from 1, of the match at `position` in the list from `findAllMatches`; 0 if it is not there. */
+export function matchNumber(matches: number[], position: Position, colCount: number): number {
+  const target = position.row * colCount + position.col
+  let low = 0
+  let high = matches.length - 1
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    if (matches[mid]! === target) return mid + 1
+    if (matches[mid]! < target) low = mid + 1
+    else high = mid - 1
+  }
+  return 0
+}

@@ -15,7 +15,8 @@ export interface SearchPanel {
   readonly query: string
   readonly exact: boolean
   readonly replacement: string
-  setMessage(text: string, isError?: boolean): void
+  /** `detail` is the longer text for the tooltip; by default the message itself. */
+  setMessage(text: string, isError?: boolean, detail?: string): void
 }
 
 /**
@@ -77,9 +78,9 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
     get replacement() {
       return replaceInput.value
     },
-    setMessage(text, isError = false) {
+    setMessage(text, isError = false, detail) {
       message.textContent = text
-      message.title = text // the full text, in case a narrow window cuts it short
+      message.title = detail ?? text // the full text, in case a narrow window cuts it short
       message.classList.toggle('error', isError)
     },
   }

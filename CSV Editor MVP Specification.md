@@ -115,7 +115,7 @@ The MVP explicitly leaves out the following; none of it should block delivery.
 | Topic | Status |
 | --- | --- |
 | Manual encoding selection when opening | Phase 2 |
-| Match counter such as "3 of 12" in search | Implementation detail, optional |
+| Match counter such as "3 of 12" in search | Done: the panel shows which match is selected and how many there are |
 | Previous match with Shift+Ctrl+G | Done (Shift+Ctrl+G, and Shift+Enter in the search field) |
 | Formats other than CSV (xlsx, json, tsv) | Out of scope |
 | Data types, formulas and arithmetic operations | Out of scope |

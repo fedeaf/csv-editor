@@ -4,7 +4,7 @@ import { encodeDocumentAsync, type CsvDocument } from './document'
 import { hasFiles, openCsv, readDropped, saveCsv, saveCsvAs } from './files'
 import { History, type Outcome } from './model/history'
 import { nextErrorRow } from './model/errors'
-import { createMatcher, findMatch, findReplacements, type Position } from './model/search'
+import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, type Position, type SearchGrid } from './model/search'
 import { TableView, uniqueValues, type ColumnFilter } from './model/view'
 import { closeContextMenu, showContextMenu } from './ui/contextMenu'
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
@@ -32,6 +32,10 @@ interface Tab {
   lastMatch: Position | undefined
   /** The last error cell reached from a header's warning, so the next click goes on to the following one. */
   lastError: { colId: number; row: number } | undefined
+  /** Goes up whenever the cells or the rows shown change; the match list below is only good for one value of it. */
+  version: number
+  /** Every match of the current search, kept so that stepping from one to the next only has to look up a number. */
+  matches: { query: string; exact: boolean; version: number; list: number[] } | undefined
   /** Scroll and selection to restore when the tab is selected again. */
   state: GridState | undefined
 }
@@ -155,7 +159,7 @@ async function openDocuments(docs: CsvDocument[]): Promise<void> {
   for (const doc of docs) {
     let tab = await findOpenTab(doc)
     if (!tab) {
-      tab = { id: nextTabId++, doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, state: undefined }
+      tab = { id: nextTabId++, doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, version: 0, matches: undefined, state: undefined }
       tabs.push(tab)
     }
     first ??= tab
@@ -231,6 +235,7 @@ function showMeta(message?: string, neutral = false): void {
 /** After a command ran, was undone or redone: refresh statistics, filters and grid, then place the cursor. */
 function applyOutcome(tab: Tab, { command, cursor }: Outcome): void {
   tab.lastError = undefined // rows may have moved or errors been fixed: the next walk starts from the top
+  tab.version++
   tab.view.stats.invalidate(command.invalidates)
   const target = cursor ?? {}
   tab.view.afterChange(target.reveal)
@@ -373,7 +378,26 @@ const search = createSearchPanel({
   onClose: () => grid.focus(),
 })
 
-/** Searches the rows shown in the tab in focus, selects the match and scrolls to it. A new search starts at the first cell. */
+/** The cells a search looks at: the rows shown in a tab. */
+function searchGrid(tab: Tab): SearchGrid {
+  const { table } = tab.doc
+  const v = tab.view
+  return { rowCount: v.rowCount, colCount: table.columnCount, cell: (r, c) => table.rowById(v.visible[r]!)!.cells[c]! }
+}
+
+/** All the matches of the search, counted once and reused until the cells or the rows shown change. */
+function matchesOf(tab: Tab, query: string, exact: boolean): number[] {
+  const cached = tab.matches
+  if (cached && cached.query === query && cached.exact === exact && cached.version === tab.version) return cached.list
+  const list = findAllMatches(searchGrid(tab), query, exact)
+  tab.matches = { query, exact, version: tab.version, list }
+  return list
+}
+
+/**
+ * Searches the rows shown in the tab in focus, selects the match and scrolls to it. A new search starts
+ * at the first cell. The panel says which match it is: "3 of 12".
+ */
 function find(mode: 'first' | 'next' | 'previous'): boolean {
   const tab = current
   const query = search.query
@@ -386,7 +410,7 @@ function find(mode: 'first' | 'next' | 'previous'): boolean {
   const { table } = tab.doc
   const v = tab.view
   const match = findMatch(
-    { rowCount: v.rowCount, colCount: table.columnCount, cell: (r, c) => table.rowById(v.visible[r]!)!.cells[c]! },
+    searchGrid(tab),
     query,
     search.exact,
     mode === 'first' ? undefined : tab.lastMatch,
@@ -399,8 +423,11 @@ function find(mode: 'first' | 'next' | 'previous'): boolean {
   }
   tab.lastMatch = match
   grid.setActive(match.row, match.col)
+  const list = matchesOf(tab, query, search.exact)
+  const number = matchNumber(list, match, table.columnCount).toLocaleString('en-US')
+  const total = list.length.toLocaleString('en-US')
   const name = table.headers[match.col] || `column ${match.col + 1}`
-  search.setMessage(`Row ${v.rowNumber(match.row)}, ${name}`)
+  search.setMessage(`${number} of ${total}`, false, `Match ${number} of ${total} · row ${v.rowNumber(match.row)}, ${name}`)
   return true
 }
 
@@ -440,7 +467,7 @@ function replaceAll(): void {
   grid.commitEdit()
   const { table } = tab.doc
   const v = tab.view
-  const shown = { rowCount: v.rowCount, colCount: table.columnCount, cell: (r: number, c: number) => table.rowById(v.visible[r]!)!.cells[c]! }
+  const shown = searchGrid(tab)
   const changes = findReplacements(shown, query, search.exact, search.replacement)
   if (changes.length === 0) {
     const anyMatch = findMatch(shown, query, search.exact)
@@ -491,6 +518,7 @@ function setFilter(colId: number, filter: ColumnFilter | undefined): void {
   tab.view.setFilter(colId, filter)
   tab.lastMatch = undefined
   tab.lastError = undefined
+  tab.version++
   grid.refresh()
   grid.setActive(0, grid.activeCell.col)
   showMeta()
@@ -502,6 +530,7 @@ function clearFilters(): void {
   tab.view.clearFilters()
   tab.lastMatch = undefined
   tab.lastError = undefined
+  tab.version++
   grid.refresh()
   showMeta()
 }

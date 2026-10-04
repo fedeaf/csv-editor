@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { fillCells, replaceCells, setCell } from './commands'
 import { History } from './history'
-import { createMatcher, findMatch, findReplacements, type SearchGrid } from './search'
+import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, type SearchGrid } from './search'
 import { Table } from './table'
 import { TableView } from './view'
 
@@ -227,5 +227,65 @@ describe('replaceCells', () => {
     const changes = findReplacements(shown, 'ana', false, 'EVA').map((c) => ({ rowId: view.visible[c.row]!, col: c.col, value: c.value }))
     replaceCells(t, changes)!.run(t)
     expect([...t.orderedCells()].map((r) => r[1])).toEqual(['EVA', 'ana', 'EVA']) // the hidden row keeps its text
+  })
+})
+
+describe('counting matches', () => {
+  const rows = [
+    ['Mariana', 'x', 'ANA'],
+    ['bob', 'ana', 'y'],
+    ['', 'z', 'Anabel'],
+  ]
+  const grid = (): SearchGrid => ({ rowCount: 3, colCount: 3, cell: (r, c) => rows[r]![c]! })
+
+  it('lists the matching cells in reading order', () => {
+    expect(findAllMatches(grid(), 'ana', false)).toEqual([0, 2, 4, 8]) // (0,0) (0,2) (1,1) (2,2)
+    expect(findAllMatches(grid(), 'ana', true)).toEqual([2, 4])
+    expect(findAllMatches(grid(), 'zzz', false)).toEqual([])
+    expect(findAllMatches(grid(), '', false)).toEqual([])
+  })
+
+  it('gives each match its number, as Find walks through them', () => {
+    const list = findAllMatches(grid(), 'ana', false)
+    const walked: number[] = []
+    let at = findMatch(grid(), 'ana', false)
+    for (let i = 0; i < 4 && at; i++) {
+      walked.push(matchNumber(list, at, 3))
+      at = findMatch(grid(), 'ana', false, at)
+    }
+    expect(walked).toEqual([1, 2, 3, 4])
+  })
+
+  it('wraps to number 1 after the last match, like Next does', () => {
+    const list = findAllMatches(grid(), 'ana', false)
+    const wrapped = findMatch(grid(), 'ana', false, { row: 2, col: 2 })!
+    expect(matchNumber(list, wrapped, 3)).toBe(1)
+  })
+
+  it('numbers going backwards too', () => {
+    const list = findAllMatches(grid(), 'ana', false)
+    expect(matchNumber(list, findMatch(grid(), 'ana', false, undefined, -1)!, 3)).toBe(4)
+  })
+
+  it('says 0 for a cell that is not a match', () => {
+    expect(matchNumber(findAllMatches(grid(), 'ana', false), { row: 1, col: 0 }, 3)).toBe(0)
+    expect(matchNumber([], { row: 0, col: 0 }, 3)).toBe(0)
+  })
+
+  it('agrees with a plain count on a larger table', () => {
+    const big: SearchGrid = { rowCount: 5000, colCount: 4, cell: (r, c) => ((r * 7 + c * 3) % 11 === 0 ? 'hit' : 'miss') }
+    const list = findAllMatches(big, 'hit', false)
+    let expected = 0
+    for (let r = 0; r < 5000; r++) for (let c = 0; c < 4; c++) if ((r * 7 + c * 3) % 11 === 0) expected++
+    expect(list.length).toBe(expected)
+    expect(matchNumber(list, { row: Math.floor(list[100]! / 4), col: list[100]! % 4 }, 4)).toBe(101)
+  })
+
+  it('counts only the rows it is given, so rows hidden by a filter are not in the total', () => {
+    const t = new Table(['k', 'v'], [['a', 'hit'], ['b', 'hit'], ['a', 'hit']])
+    const view = new TableView(t)
+    view.setFilter(t.colIds[0]!, { selected: new Set(['a']), duplicatesOnly: false })
+    const shown: SearchGrid = { rowCount: view.rowCount, colCount: 2, cell: (r, c) => t.rowById(view.visible[r]!)!.cells[c]! }
+    expect(findAllMatches(shown, 'hit', false)).toHaveLength(2)
   })
 })
