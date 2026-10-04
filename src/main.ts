@@ -1,6 +1,6 @@
 import { deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, setCell, sortRows, type Command } from './model/commands'
 import { parseTsv, squared, toTsv } from './model/clipboard'
-import { encodeDocument, type CsvDocument } from './document'
+import { encodeDocumentAsync, type CsvDocument } from './document'
 import { hasFiles, openCsv, readDropped, saveCsv, saveCsvAs } from './files'
 import { History, type Outcome } from './model/history'
 import { findMatch, type Position } from './model/search'
@@ -9,6 +9,7 @@ import { closeContextMenu, showContextMenu } from './ui/contextMenu'
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
 import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
 import { Grid, type FillRequest, type GridModel, type GridState, type Rect } from './ui/grid'
+import { confirmDialog, isDialogOpen, messageDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
 import { createTabBar, tabAfterClose } from './ui/tabBar'
 
@@ -54,7 +55,7 @@ const grid = new Grid($('grid-host'), {
 
 const tabBar = createTabBar($('tabs'), {
   onSelect: (id) => activate(tabs.find((t) => t.id === id)),
-  onClose: (id) => closeTab(tabs.find((t) => t.id === id)),
+  onClose: (id) => void closeTab(tabs.find((t) => t.id === id)),
 })
 
 /** The grid reads the view live, so a refresh is enough after any change. */
@@ -109,10 +110,26 @@ function activate(tab: Tab | undefined): void {
   else $('empty-open').focus() // the start screen's button, so Enter opens a file
 }
 
-function closeTab(tab: Tab | undefined): void {
-  if (!tab) return
+/** Tabs whose "discard changes?" question is on screen, so a second click on × does not ask twice. */
+const closing = new Set<Tab>()
+
+async function closeTab(tab: Tab | undefined): Promise<void> {
+  if (!tab || closing.has(tab)) return
   if (tab === current) grid.commitEdit() // an unfinished edit counts as a change
-  if (tab.history.dirty && !confirm(`"${tab.doc.name}" has unsaved changes. Close it and discard them?`)) return
+  if (tab.history.dirty) {
+    closing.add(tab)
+    const discard = await confirmDialog({
+      title: `Close "${tab.doc.name}"?`,
+      message: 'It has unsaved changes. If you close it, they will be lost.',
+      confirmLabel: 'Close and discard',
+      danger: true,
+    })
+    closing.delete(tab)
+    if (!discard || !tabs.includes(tab)) {
+      if (current) grid.focus() // back to the table, not to the × that was clicked
+      return
+    }
+  }
   const next = tabAfterClose(tabs.map((t) => t.id), tab.id, current?.id)
   tabs.splice(tabs.indexOf(tab), 1)
   // Closing the tab in focus switches to its neighbour (or to the empty state); another tab just goes away.
@@ -251,7 +268,7 @@ const isTextField = (target: EventTarget | null) =>
 /** Copies what is shown in the selection (rows hidden by a filter are left out) as text spreadsheets understand. */
 function copySelection(e: ClipboardEvent, cut: boolean): void {
   const tab = current
-  if (!tab || grid.isEditing || isTextField(e.target) || !e.clipboardData) return
+  if (!tab || isDialogOpen() || grid.isEditing || isTextField(e.target) || !e.clipboardData) return
   const rect = grid.selection()
   const rows: string[][] = []
   for (let r = rect.r0; r <= rect.r1; r++) {
@@ -274,7 +291,7 @@ function copySelection(e: ClipboardEvent, cut: boolean): void {
 function pasteClipboard(e: ClipboardEvent): void {
   const tab = current
   const text = e.clipboardData?.getData('text/plain')
-  if (!tab || grid.isEditing || isTextField(e.target) || !text) return
+  if (!tab || isDialogOpen() || grid.isEditing || isTextField(e.target) || !text) return
   const block = squared(parseTsv(text))
   const table = tab.doc.table
   if (block.length === 0 || table.columnCount === 0) return
@@ -400,9 +417,15 @@ function toggleDuplicates(col: number): void {
 
 // --- file actions -----------------------------------------------------------------------
 
-function confirmUtf8(chars: string[]): boolean {
-  const list = chars.slice(0, 10).join(' ')
-  return confirm(`This file is saved as Windows-1252, which cannot represent: ${list}\n\nSave it as UTF-8 instead?`)
+/** Asks, with a dialog, whether to save as UTF-8 characters the file's own encoding cannot hold. */
+function confirmUtf8(doc: CsvDocument, chars: string[]): Promise<boolean> {
+  const label = doc.format.encoding === 'windows-1252' ? 'Windows-1252' : doc.format.encoding.toUpperCase()
+  const list = chars.slice(0, 10).join(' ') + (chars.length > 10 ? ' …' : '')
+  return confirmDialog({
+    title: 'Save as UTF-8?',
+    message: `"${doc.name}" is saved as ${label}, which cannot represent: ${list}\n\nUTF-8 can. Save it as UTF-8 instead?`,
+    confirmLabel: 'Save as UTF-8',
+  })
 }
 
 async function open(): Promise<void> {
@@ -414,7 +437,7 @@ async function save(as: boolean): Promise<void> {
   const tab = current
   if (!tab) return
   grid.commitEdit()
-  const encoded = encodeDocument(tab.doc, confirmUtf8)
+  const encoded = await encodeDocumentAsync(tab.doc, (chars) => confirmUtf8(tab.doc, chars))
   if (!encoded) return
   const saved = await (as ? saveCsvAs(tab.doc, encoded.bytes) : saveCsv(tab.doc, encoded.bytes))
   if (!saved) return
@@ -423,8 +446,8 @@ async function save(as: boolean): Promise<void> {
   showMeta(tab === current ? `Saved ${tab.doc.name}` : undefined)
 }
 
-function report(err: unknown): void {
-  alert(err instanceof Error ? err.message : String(err))
+function report(err: unknown, title = 'Something went wrong'): void {
+  void messageDialog(title, err instanceof Error ? err.message : String(err))
 }
 
 // --- menus ------------------------------------------------------------------------------
@@ -549,7 +572,7 @@ window.addEventListener('drop', (e) => {
   readDropped(e.dataTransfer!)
     .then(async ({ docs, errors }) => {
       await openDocuments(docs)
-      if (errors.length > 0) report(new Error(errors.join('\n')))
+      if (errors.length > 0) await messageDialog(errors.length === 1 ? 'A file was not opened' : 'Some files were not opened', errors.join('\n'))
     })
     .catch(report)
 })

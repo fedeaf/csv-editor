@@ -48,3 +48,30 @@ export function encodeDocument(doc: CsvDocument, confirmUtf8: (chars: string[]) 
   }
   return { bytes: encode(text, format), format }
 }
+
+/** Asked from inside `encodeDocument` to stop it and report what needs a decision. */
+class Utf8Needed extends Error {
+  constructor(readonly chars: string[]) {
+    super('Some characters need UTF-8')
+  }
+}
+
+/**
+ * Like `encodeDocument`, but the question about UTF-8 can be answered later (a dialog on screen).
+ * The first pass stops at the question; if there is one, it is asked and the document is encoded
+ * again with the answer. That second pass only happens when characters do not fit the encoding.
+ */
+export async function encodeDocumentAsync(
+  doc: CsvDocument,
+  confirmUtf8: (chars: string[]) => Promise<boolean>,
+): Promise<Encoded | undefined> {
+  try {
+    return encodeDocument(doc, (chars) => {
+      throw new Utf8Needed(chars)
+    })
+  } catch (e) {
+    if (!(e instanceof Utf8Needed)) throw e
+    const accepted = await confirmUtf8(e.chars)
+    return encodeDocument(doc, () => accepted)
+  }
+}

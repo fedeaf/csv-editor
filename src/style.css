@@ -43,7 +43,9 @@
   --notice-bg: #fff4ce; /* the banner for rows that were padded or widened */
   --notice-line: #e6d28a;
   --ok: #34a853; /* no duplicates */
-  --danger: #c5221f; /* no matches */
+  --danger: #c5221f; /* no matches, and a button that discards */
+  --danger-strong: #a50e0e;
+  --scrim: rgb(32 33 36 / 45%); /* the dim layer behind a dialog */
 
   --shadow-popup: 0 4px 14px rgb(0 0 0 / 20%);
   --shadow-panel: 0 2px 10px rgb(0 0 0 / 20%);
@@ -193,3 +195,17 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .primary-button { padding: 8px 22px; border: 1px solid var(--accent); border-radius: 4px; background: var(--accent); color: var(--accent-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .primary-button:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
 .primary-button:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+
+/* Dialogs */
+.dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: var(--scrim); }
+.dialog { width: min(440px, 100%); padding: 20px 22px 16px; background: var(--surface); border-radius: 8px; box-shadow: var(--shadow-popup); }
+.dialog h2 { margin: 0 0 8px; font-size: 16px; font-weight: 600; color: var(--ink); }
+.dialog p { margin: 0; color: var(--ink-muted); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.dialog-actions button { padding: 7px 16px; border-radius: 4px; font: inherit; font-weight: 600; cursor: pointer; }
+.secondary-button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.secondary-button:hover { background: var(--chrome); }
+.danger-button { border: 1px solid var(--danger); background: var(--danger); color: var(--accent-ink); }
+.danger-button:hover { background: var(--danger-strong); border-color: var(--danger-strong); }
+.dialog-actions button:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+.danger-button:focus-visible { outline-color: var(--warn-bg-hover); }

@@ -300,6 +300,7 @@ Added after the MVP was specified:
 - **Copy, cut and paste** of cells, blocks, rows and columns, as the tab-separated text that Excel and Google Sheets use. A single value pasted over a selection fills it. Lines that do not fit become new rows and a block that is too wide adds columns, so nothing is dropped.
 - **Delete** empties the selected cells.
 - **Start screen.** With no file open, the window shows an Open button and a note that files can be dropped anywhere in it.
+- **In-page dialogs** instead of the browser's own alert and confirm, for closing a tab with unsaved changes, for saving as UTF-8 when a character does not fit the file's encoding, and for errors. They name what each button does, start on Cancel when the action discards something, and keep keys and shortcuts from reaching the table underneath.
 - **Resizable columns.** Drag the edge of a header to resize a column, between 120 and 1200 pixels; double-click it to fit the content. The minimum leaves room for the header's controls. Widths belong to the view: they are kept per tab, are not part of the history and are not saved in the file.
 
 ## Verification
