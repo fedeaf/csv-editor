@@ -193,9 +193,12 @@ body { display: flex; flex-direction: column; background: var(--surface); }
 .fill-preview { position: absolute; z-index: 1; border: 2px dashed var(--accent); background: var(--accent-overlay-weak); pointer-events: none; }
 body.filling, body.filling * { cursor: crosshair !important; user-select: none; }
 
-/* Find panel: one row, sitting in the toolbar so it never covers the column headers */
-:root { --find-width: min(600px, calc(100vw - 300px)); }
-.search-panel { position: fixed; z-index: 35; top: 3px; right: 12px; width: var(--find-width); padding: 3px 4px 3px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-panel); }
+/*
+ * The Find panel floats at the top right of the table, starting just under the row of column headers
+ * (28px, with a small gap), so the headers stay in view and only the first rows are covered.
+ */
+:root { --find-width: min(600px, calc(100vw - 48px)); }
+.search-panel { position: absolute; z-index: 35; top: calc(28px + 4px); right: 24px; width: var(--find-width); padding: 3px 4px 3px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-panel); }
 .search-panel[hidden] { display: none; }
 .sp-row { display: flex; align-items: center; gap: 8px; height: 24px; }
 .sp-row + .sp-row { margin-top: 4px; }
@@ -218,7 +221,6 @@ body.filling, body.filling * { cursor: crosshair !important; user-select: none; 
 .menu { align-self: flex-end; } /* on the same line as the tabs */
 #tabs { display: flex; flex: 1; min-width: 0; gap: 2px; align-items: flex-end; overflow-x: auto; scrollbar-width: none; }
 #tabs::-webkit-scrollbar { display: none; }
-body.find-open #tabs { margin-right: calc(var(--find-width) + 12px); }
 .tabs-empty { align-self: center; padding-bottom: 6px; color: var(--ink-subtle); }
 .tab { display: flex; flex: none; align-items: center; gap: 4px; max-width: 220px; height: 30px; padding: 0 4px 0 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 5px 5px 0 0; color: var(--ink-muted); cursor: pointer; user-select: none; }
 .tab:hover { background: var(--chrome-hover-soft); }

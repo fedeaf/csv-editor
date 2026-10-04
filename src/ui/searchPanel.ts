@@ -41,7 +41,8 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
       <button class="sp-replace-one" title="Replace this match and go to the next">Replace</button>
       <button class="sp-replace-all" title="Replace every match in the rows shown">Replace all</button>
     </div>`
-  document.body.append(root)
+  // In the area of the table, so that it sits under the column headers and follows the table around.
+  document.getElementById('grid-host')!.append(root)
   const $ = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector)!
   const input = $<HTMLInputElement>('.sp-input')
   const exact = $<HTMLInputElement>('.sp-exact input')
@@ -56,14 +57,12 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
   const panel: SearchPanel = {
     open() {
       root.hidden = false
-      document.body.classList.add('find-open')
       input.focus()
       input.select()
     },
     close() {
       if (root.hidden) return
       root.hidden = true
-      document.body.classList.remove('find-open')
       handlers.onClose()
     },
     get isOpen() {
