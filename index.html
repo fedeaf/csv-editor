@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSV Editor</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header id="toolbar">
+      <div class="menu">
+        <button id="menu-button" aria-haspopup="menu" aria-expanded="false">Menu ▾</button>
+        <ul id="menu-list" class="popup-menu" role="menu" hidden>
+          <li role="menuitem" data-action="open">Open…</li>
+          <li role="menuitem" data-action="save">Save<kbd>Ctrl+S</kbd></li>
+          <li role="menuitem" data-action="save-as">Save As…</li>
+          <li role="separator" class="separator"></li>
+          <li role="menuitem" data-action="undo">Undo<kbd>Ctrl+Z</kbd></li>
+          <li role="menuitem" data-action="redo">Redo<kbd>Ctrl+Y</kbd></li>
+          <li role="separator" class="separator"></li>
+          <li role="menuitem" data-action="find">Find…<kbd>Ctrl+F</kbd></li>
+          <li role="menuitem" data-action="clear-filters">Clear all filters</li>
+        </ul>
+      </div>
+      <div id="tabs"></div>
+    </header>
+    <div id="warnings" hidden></div>
+    <main id="grid-host">
+      <div id="empty">Use <b>Menu ▸ Open…</b> or drop a CSV file here.</div>
+    </main>
+    <div id="drop-overlay" hidden><div>Drop a CSV file to open it</div></div>
+    <footer id="status"></footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

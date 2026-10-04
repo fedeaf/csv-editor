@@ -1,0 +1,23 @@
+{
+  "name": "csv-editor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "samples": "node scripts/gen-samples.mjs"
+  },
+  "dependencies": {
+    "papaparse": "^5.7.0"
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.5.2",
+    "@types/wicg-file-system-access": "^2023.10.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  }
+}
