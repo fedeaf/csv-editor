@@ -34,7 +34,7 @@ Each requirement has an ID for referencing in tickets and milestones. Items mark
 | ARC-02 | Automatically detect the encoding among UTF-8, ASCII, Windows-1252 and ISO-8859-1. No manual selection in the MVP. |
 | ARC-03 | Save over the same file, and Save As. |
 | ARC-04 | On save, preserve the original encoding, delimiter, line endings and BOM (assumption, D-03). |
-| ARC-05 | Unsaved changes indicator: an asterisk in the browser tab title and in the UI. |
+| ARC-05 | Unsaved changes indicator: an asterisk in the browser tab title and in the UI. The browser tab keeps the name "CSV Editor" whatever files are open, with the asterisk in front while any of them has unsaved changes; the asterisk next to each file's name is in the strip of tabs. |
 | ARC-06 | Browser warning when closing or reloading with unsaved changes. |
 
 ### Grid and editing (EDI)

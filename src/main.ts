@@ -211,8 +211,9 @@ function showActivity(): void {
 function showMeta(message?: string, neutral = false): void {
   tabBar.render(tabs.map((t) => ({ id: t.id, label: t.doc.name, dirty: t.history.dirty, active: t === current })))
   const tab = current
-  const mark = tab?.history.dirty ? '* ' : ''
-  document.title = tab ? `${mark}${tab.doc.name} - CSV Editor` : 'CSV Editor'
+  // The browser tab keeps the name of the app whatever is open. Its asterisk (ARC-05) says that some
+  // document has unsaved changes; which one is shown by the asterisk in the strip of tabs.
+  document.title = `${tabs.some((t) => t.history.dirty) ? '* ' : ''}CSV Editor`
   const item = (action: string) => $('menu-list').querySelector(`[data-action=${action}]`)!
   item('undo').classList.toggle('disabled', !tab?.history.canUndo)
   item('redo').classList.toggle('disabled', !tab?.history.canRedo)
