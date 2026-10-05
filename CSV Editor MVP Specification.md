@@ -309,6 +309,7 @@ Added after the MVP was specified:
 - **App icon** in the browser tab: a blue rounded square with a white table (a pale header row over three more), the colour of the interface's accent. It is an SVG written inline in the page's `<link rel="icon">`, so the file stays self-contained, and it stays legible at 16 px.
 - **Drag and drop** of one or more CSV files onto the window; each opens in its own tab.
 - **Selecting blocks** by dragging, with Shift and the arrows, and with Ctrl+Shift and the arrows to the end of a row or column. Whole rows and columns by their number or header. Ctrl+A selects everything.
+- **The corner cell** (above the row numbers, left of the headers) selects everything when clicked, like Ctrl+A, without moving the view. Its right-click menu is unchanged.
 - **Ctrl and the arrows** jump to the first or last row or column.
 - **Copy, cut and paste** of cells, blocks, rows and columns, as the tab-separated text that Excel and Google Sheets use. A single value pasted over a selection fills it. Lines that do not fit become new rows and a block that is too wide adds columns, so nothing is dropped.
 - **Delete** empties the selected cells.

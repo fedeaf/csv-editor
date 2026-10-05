@@ -209,7 +209,9 @@ export class Grid {
       const columns = model.headers.length
       this.header.style.height = `${HEADER_HEIGHT}px`
       this.body.style.height = `${model.rowCount * ROW_HEIGHT}px`
-      this.header.append(cell('row-number', ''))
+      const corner = cell('row-number', '')
+      corner.title = 'Select all (Ctrl+A)'
+      this.header.append(corner)
       model.headers.forEach((name, col) => this.header.append(this.buildHeaderCell(col, name, model.column(col))))
       this.active = {
         row: clamp(this.active.row, model.rowCount - 1),
@@ -285,6 +287,12 @@ export class Grid {
     this.band = null
     if (reveal) this.ensureVisible(this.extent.row, this.extent.col)
     this.paint()
+  }
+
+  /** Selects every cell, as Ctrl+A and a click on the corner do; the view stays where it is. */
+  selectAll(): void {
+    const model = this.model
+    if (model) this.selectRange(0, 0, model.rowCount - 1, model.headers.length - 1, false)
   }
 
   /** Inclusive range of selected rows. */
@@ -504,7 +512,7 @@ export class Grid {
         case 'ArrowRight': return handled(), this.setActive(this.active.row, lastCol)
         case 'a':
         case 'A':
-          return handled(), this.selectRange(0, 0, lastRow, lastCol, false)
+          return handled(), this.selectAll()
       }
       return
     }
@@ -638,6 +646,9 @@ export class Grid {
       case 'header':
         this.selectBand('cols', hit.col, e.shiftKey)
         this.startSelectDrag('cols', e)
+        break
+      case 'corner':
+        this.selectAll()
         break
     }
     this.focus()
