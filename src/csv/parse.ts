@@ -1,6 +1,6 @@
 import Papa from 'papaparse'
 
-export type Delimiter = ',' | ';'
+export type Delimiter = ',' | ';' | '\t' | '|'
 export type LineEnding = '\n' | '\r\n'
 
 export interface ParsedCsv {
@@ -16,7 +16,7 @@ export interface ParsedCsv {
 
 const CANDIDATES: Delimiter[] = [',', ';']
 
-/** Comma or semicolon (D-02): the one that gives the most consistent multi-column rows. */
+/** Comma or semicolon (D-02); tab and pipe can only be chosen by hand: the one that gives the most consistent multi-column rows. */
 export function detectDelimiter(text: string): Delimiter {
   let best: Delimiter = ','
   let bestScore = 0
@@ -33,8 +33,9 @@ export function detectDelimiter(text: string): Delimiter {
   return best
 }
 
-export function parseCsv(text: string): ParsedCsv {
-  const delimiter = detectDelimiter(text)
+/** `chosen` is a delimiter picked by the user; without it the delimiter is detected. */
+export function parseCsv(text: string, chosen?: Delimiter): ParsedCsv {
+  const delimiter = chosen ?? detectDelimiter(text)
   const lineEnding: LineEnding = /\r\n/.test(text.slice(0, text.indexOf('\n') + 1)) ? '\r\n' : '\n'
   const trailingNewline = text.endsWith('\n')
   // Papa reports a spurious empty last row for a trailing line break.

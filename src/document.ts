@@ -8,17 +8,29 @@ export interface CsvDocument {
   table: Table
   format: FileFormat
   handle?: FileSystemFileHandle
+  /** The bytes read, kept only when there is no file handle to read them from again. */
+  source?: Uint8Array
   warnings: string[]
 }
 
-export function loadDocument(name: string, bytes: Uint8Array, handle?: FileSystemFileHandle): CsvDocument {
-  const detected = detectEncoding(bytes)
-  const parsed = parseCsv(decode(bytes, detected))
+/** How a file is read when the user chooses it instead of leaving it to detection. */
+export type ChosenFormat = Pick<FileFormat, 'encoding' | 'bom' | 'delimiter'>
+
+export function loadDocument(name: string, bytes: Uint8Array, handle?: FileSystemFileHandle, chosen?: ChosenFormat): CsvDocument {
+  const encoding = chosen ?? detectEncoding(bytes)
+  const parsed = parseCsv(decode(bytes, encoding), chosen?.delimiter)
   return {
     name,
     table: new Table(parsed.headers, parsed.rows),
-    format: { ...detected, delimiter: parsed.delimiter, lineEnding: parsed.lineEnding, trailingNewline: parsed.trailingNewline },
+    format: {
+      encoding: encoding.encoding,
+      bom: encoding.bom,
+      delimiter: parsed.delimiter,
+      lineEnding: parsed.lineEnding,
+      trailingNewline: parsed.trailingNewline,
+    },
     handle,
+    source: handle ? undefined : bytes,
     warnings: parsed.warnings,
   }
 }

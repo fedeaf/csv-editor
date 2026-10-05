@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { deleteColumns, deleteRows, insertColumn, insertRows, renameHeader, setCell } from './commands'
+import { changeFormat, deleteColumns, deleteRows, insertColumn, insertRows, renameHeader, setCell } from './commands'
 import { History } from './history'
-import { Table } from './table'
+import { Table, type FileFormat } from './table'
 
 const make = () =>
   new Table(['a', 'b', 'c'], [
@@ -123,5 +123,20 @@ describe('history', () => {
     h.undo(t)
     h.undo(t)
     expect(h.dirty).toBe(true)
+  })
+})
+
+describe('changeFormat', () => {
+  it('changes how a document is written, and puts it back on undo', () => {
+    const doc = { format: { encoding: 'utf-8', bom: false, delimiter: ',', lineEnding: '\n', trailingNewline: true } as FileFormat }
+    const next = { ...doc.format, delimiter: ';' as const, lineEnding: '\r\n' as const }
+    const table = new Table(['a'], [['1']])
+    const history = new History()
+    history.execute(changeFormat(doc, next), table)
+    expect(doc.format).toBe(next)
+    expect(history.dirty).toBe(true)
+    history.undo(table)
+    expect(doc.format.delimiter).toBe(',')
+    expect(history.dirty).toBe(false)
   })
 })

@@ -151,3 +151,47 @@ describe('saving with unencodable characters (D-03)', () => {
     expect(doc.format.encoding).toBe('windows-1252') // not adopted until the write succeeds
   })
 })
+
+describe('encoding and delimiter chosen by hand', () => {
+  const utf16le = (s: string) => encode(s, { encoding: 'utf-16le', bom: true })
+
+  it('detects, reads and writes UTF-16 with its byte order mark', () => {
+    const input = utf16le('a\tb\nñ\t😀\n')
+    expect(Array.from(input.subarray(0, 2))).toEqual([0xff, 0xfe])
+    expect(detectEncoding(input)).toEqual({ encoding: 'utf-16le', bom: true })
+    expect(detectEncoding(encode('x', { encoding: 'utf-16be', bom: true }))).toEqual({ encoding: 'utf-16be', bom: true })
+    expect(decode(input, { encoding: 'utf-16le' })).toBe('a\tb\nñ\t😀\n')
+    expect(unencodableChars('😀', 'utf-16le')).toEqual([])
+  })
+
+  it('reads a tab-delimited UTF-16 file when told to, and saves it the same way', () => {
+    const input = utf16le('a\tb\n1\t2\n')
+    const doc = loadDocument('t.txt', input, undefined, { encoding: 'utf-16le', bom: true, delimiter: '\t' })
+    expect(doc.table.headers).toEqual(['a', 'b'])
+    expect(doc.format).toMatchObject({ encoding: 'utf-16le', bom: true, delimiter: '\t' })
+    expect(Array.from(encodeDocument(doc, () => false)!.bytes)).toEqual(Array.from(input))
+  })
+
+  it('splits on a tab or a pipe only when chosen', () => {
+    expect(parseCsv('a\tb\n1\t2').headers).toEqual(['a\tb'])
+    expect(parseCsv('a\tb\n1\t2', '\t').headers).toEqual(['a', 'b'])
+    expect(parseCsv('a|b\n1|2', '|').rows).toEqual([['1', '2']])
+  })
+
+  it('quotes a value that holds the delimiter chosen', () => {
+    const csv = serializeCsv(['a', 'b'], [['x|y', 'z']], { delimiter: '|', lineEnding: '\n', trailingNewline: false })
+    expect(csv).toBe('a|b\n"x|y"|z')
+  })
+
+  it('reads a file with a byte order mark as an encoding without one, dropping the mark from the text', () => {
+    const input = bytes(0xef, 0xbb, 0xbf, 0x61, 0x2c, 0x62)
+    const doc = loadDocument('t.csv', input, undefined, { encoding: 'utf-8', bom: false, delimiter: ',' })
+    expect(doc.table.headers).toEqual(['a', 'b'])
+    expect(doc.format.bom).toBe(false)
+  })
+
+  it('keeps the bytes of a document that has no file handle, to read them again', () => {
+    expect(loadDocument('t.csv', utf8('a,b')).source).toEqual(utf8('a,b'))
+    expect(loadDocument('t.csv', utf8('a,b'), {} as FileSystemFileHandle).source).toBeUndefined()
+  })
+})

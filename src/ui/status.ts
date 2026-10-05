@@ -1,5 +1,6 @@
 // The texts of the status bar. Its left side says what is going on (the selection, or the result of
 // the last action) and its right side describes the file; both are built here.
+import { DELIMITER_NAMES, encodingLabel } from '../model/formatOptions'
 import type { FileFormat } from '../model/table'
 import type { Rect } from './grid'
 
@@ -23,8 +24,8 @@ export interface FileInfo {
 
 /** "Showing 5 of 7 rows × 4 columns · UTF-8 · comma-delimited". */
 export function fileInfo({ rows, rowsShown, columns, format }: FileInfo): string {
-  const encoding = format.encoding === 'utf-8' ? (format.bom ? 'UTF-8 with BOM' : 'UTF-8') : 'Windows-1252 / ISO-8859-1'
-  const delimiter = format.delimiter === ',' ? 'comma' : 'semicolon'
+  const encoding = encodingLabel(format)
+  const delimiter = DELIMITER_NAMES[format.delimiter]
   const rowText = rowsShown === undefined ? plural(rows, 'row') : `Showing ${rowsShown.toLocaleString('en-US')} of ${plural(rows, 'row')}`
   return `${rowText} × ${plural(columns, 'column')} · ${encoding} · ${delimiter}-delimited`
 }

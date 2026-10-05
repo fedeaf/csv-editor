@@ -44,3 +44,11 @@ describe('fileInfo', () => {
     )
   })
 })
+
+describe('fileInfo formats', () => {
+  const info = (format: Parameters<typeof fileInfo>[0]['format']) => fileInfo({ rows: 1, columns: 2, format })
+  it('names every encoding and delimiter', () => {
+    expect(info({ encoding: 'utf-16le', bom: true, delimiter: '\t' })).toBe('1 row × 2 columns · UTF-16 LE (with BOM) · tab-delimited')
+    expect(info({ encoding: 'utf-8', bom: true, delimiter: '|' })).toBe('1 row × 2 columns · UTF-8 with BOM · pipe-delimited')
+  })
+})

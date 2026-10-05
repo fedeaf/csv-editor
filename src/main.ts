@@ -1,8 +1,10 @@
-import { deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, setCell, sortRows, type Command } from './model/commands'
+import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, setCell, sortRows, type Command } from './model/commands'
 import { parseTsv, squared, toTsv } from './model/clipboard'
-import { blankDocument, encodeDocumentAsync, untitledName, type CsvDocument } from './document'
-import { hasFiles, openCsv, readDropped, saveCsv, saveCsvAs } from './files'
+import { blankDocument, encodeDocumentAsync, loadDocument, untitledName, type CsvDocument } from './document'
+import { hasFiles, openCsv, readDropped, readSource, saveCsv, saveCsvAs } from './files'
+import { DELIMITER_NAMES, encodingLabel } from './model/formatOptions'
 import { History, type Outcome } from './model/history'
+import type { FileFormat } from './model/table'
 import { nextErrorRow } from './model/errors'
 import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, type Position, type SearchGrid } from './model/search'
 import { TableView, uniqueValues, type ColumnFilter } from './model/view'
@@ -10,7 +12,7 @@ import { closeContextMenu, showContextMenu, type MenuItem } from './ui/contextMe
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
 import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
 import { Grid, type FillRequest, type GridHandlers, type GridModel, type GridState, type Rect } from './ui/grid'
-import { confirmDialog, isDialogOpen, messageDialog } from './ui/dialog'
+import { confirmDialog, formatDialog, isDialogOpen, messageDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
 import { fileInfo, plural, selectionSummary } from './ui/status'
 import { currentTheme, toggleTheme, watchTheme } from './ui/theme'
@@ -183,9 +185,11 @@ function focusPane(pane: Pane): void {
 }
 
 /** Shows a tab (or the start screen) in a pane. Whatever was being edited there is applied first. */
-function showIn(pane: Pane, tab: Tab | undefined): void {
+function showIn(pane: Pane, tab: Tab | undefined, fresh = false): void {
   pane.grid.commitEdit()
-  if (pane.tab) pane.tab.state = pane.grid.saveState()
+  // `fresh`: the tab holds a new document, so the old scroll and selection mean nothing.
+  if (tab && fresh) tab.state = undefined
+  else if (pane.tab) pane.tab.state = pane.grid.saveState()
   pane.tab = tab
   if (pane === focused) current = tab
   pane.grid.setModel(tab && modelFor(tab.view), tab?.state)
@@ -346,6 +350,7 @@ function showMeta(message?: string, neutral = false): void {
   item('redo').classList.toggle('disabled', !tab?.history.canRedo)
   item('save').classList.toggle('disabled', !tab)
   item('save-as').classList.toggle('disabled', !tab)
+  item('format').classList.toggle('disabled', !tab)
   item('find').classList.toggle('disabled', !tab)
   item('clear-filters').classList.toggle('disabled', !tab?.view.filtered)
   item('split-side').classList.toggle('disabled', layout === 'side')
@@ -779,6 +784,44 @@ async function save(as: boolean): Promise<void> {
   showMeta(tab === current ? `Saved ${tab.doc.name}` : undefined)
 }
 
+/** True when two formats write a document the same way. */
+const sameFormat = (a: FileFormat, b: FileFormat) =>
+  a.encoding === b.encoding && a.bom === b.bom && a.delimiter === b.delimiter && a.lineEnding === b.lineEnding
+
+/**
+ * The File Format dialog. "Reload file" reads the file again with the encoding and delimiter chosen,
+ * for when detection got them wrong; "Use when saving" keeps the cells and changes how the file is
+ * written, as an undoable change.
+ */
+async function chooseFormat(): Promise<void> {
+  const tab = current
+  if (!tab) return
+  grid.commitEdit()
+  const answer = await formatDialog(tab.doc.name, tab.doc.format, !!(tab.doc.handle || tab.doc.source))
+  if (!answer || !tabs.includes(tab)) return
+  const describe = (f: FileFormat) => `${encodingLabel(f)}, ${DELIMITER_NAMES[f.delimiter]}-delimited`
+  if (answer.action === 'save') {
+    if (sameFormat(answer.format, tab.doc.format)) return showMeta('The format is already that one', true)
+    applyOutcome(tab, tab.history.execute(changeFormat(tab.doc, answer.format), tab.doc.table))
+    return showMeta(`Will be saved as ${describe(answer.format)}`)
+  }
+  if (tab.history.dirty) {
+    const discard = await confirmDialog({
+      title: `Reload "${tab.doc.name}"?`,
+      message: 'It has unsaved changes. If you reload it, they will be lost.',
+      confirmLabel: 'Reload and discard',
+      danger: true,
+    })
+    if (!discard || !tabs.includes(tab)) return
+  }
+  const doc = loadDocument(tab.doc.name, await readSource(tab.doc), tab.doc.handle, answer.format)
+  if (!tabs.includes(tab)) return
+  Object.assign(tab, { doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, matches: undefined })
+  tab.version++
+  for (const pane of panes) if (pane.tab === tab) showIn(pane, tab, true)
+  showMeta(`Reloaded as ${describe(doc.format)}`)
+}
+
 function report(err: unknown, title = 'Something went wrong'): void {
   void messageDialog(title, err instanceof Error ? err.message : String(err))
 }
@@ -790,6 +833,7 @@ const actions: Record<string, () => void | Promise<void>> = {
   open,
   save: () => save(false),
   'save-as': () => save(true),
+  format: chooseFormat,
   undo,
   redo,
   'split-side': () => setLayout('side'),

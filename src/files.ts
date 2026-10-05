@@ -1,6 +1,9 @@
 import { loadDocument, type CsvDocument } from './document'
 
-const CSV_TYPES: FilePickerAcceptType[] = [{ description: 'CSV files', accept: { 'text/csv': ['.csv'] } }]
+const CSV_TYPES: FilePickerAcceptType[] = [
+  { description: 'CSV and text files', accept: { 'text/csv': ['.csv'], 'text/tab-separated-values': ['.tsv'], 'text/plain': ['.txt'] } },
+]
+const OPENABLE = /\.(csv|tsv|txt)$/i
 
 function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError'
@@ -20,6 +23,13 @@ export async function openCsv(): Promise<CsvDocument[]> {
     if (isAbort(e)) return []
     throw e
   }
+}
+
+/** The bytes of a document's file as they are on disk now, for reading it again in another format. */
+export async function readSource(doc: CsvDocument): Promise<Uint8Array> {
+  if (doc.handle) return new Uint8Array(await (await doc.handle.getFile()).arrayBuffer())
+  if (doc.source) return doc.source
+  throw new Error('This document is not a file yet, so there is nothing to read again.')
 }
 
 export function hasFiles(data: DataTransfer | null): boolean {
@@ -49,7 +59,7 @@ export async function readDropped(data: DataTransfer): Promise<{ docs: CsvDocume
       const handle = found?.kind === 'file' ? (found as FileSystemFileHandle) : undefined
       const file = handle ? await handle.getFile() : entry.file
       if (!file) throw new Error(`"${name}" could not be read.`)
-      if (!/\.csv$/i.test(file.name)) throw new Error(`"${file.name}" is not a CSV file. Only .csv files can be opened.`)
+      if (!OPENABLE.test(file.name)) throw new Error(`"${file.name}" is not a CSV file. Only .csv, .tsv and .txt files can be opened.`)
       docs.push(loadDocument(file.name, new Uint8Array(await file.arrayBuffer()), handle))
     } catch (e) {
       errors.push(e instanceof Error ? e.message : `"${name}" could not be opened.`)

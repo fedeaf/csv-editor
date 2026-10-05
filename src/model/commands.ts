@@ -1,5 +1,5 @@
 import { sortedOrder } from './sort'
-import type { SortDirection, Table } from './table'
+import type { FileFormat, SortDirection, Table } from './table'
 
 /** Where the cursor should land after a command runs or is reverted; a missing part keeps its place. */
 export interface Cursor {
@@ -30,6 +30,21 @@ export function setCell(table: Table, rowId: number, col: number, value: string)
     return { rowId, col }
   }
   return { label: 'Edit cell', invalidates: [colId], run: (t) => write(t, value), revert: (t) => write(t, before) }
+}
+
+/** Changes how the document is written (encoding, delimiter, line endings); the cells stay as they are. */
+export function changeFormat(doc: { format: FileFormat }, next: FileFormat): Command {
+  const before = doc.format
+  return {
+    label: 'Change file format',
+    invalidates: 'none',
+    run: () => {
+      doc.format = next
+    },
+    revert: () => {
+      doc.format = before
+    },
+  }
 }
 
 export function renameHeader(table: Table, col: number, name: string): Command {
