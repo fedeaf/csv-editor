@@ -834,6 +834,18 @@ menuList.addEventListener('click', (e) => {
  * Insert and delete live in the context menu of row numbers and column headers (D-09), and the menu of
  * a cell has them too, together with cut, copy, paste and clear. They all act on what is selected.
  */
+/** Cut, copy, paste and clear, acting on the cells selected (a block, or the whole of the rows or columns chosen). */
+function editItems(rect: Rect): MenuItem[] {
+  return [
+    { label: 'Cut', hint: 'Ctrl+X', run: () => void copyFromMenu(true) },
+    { label: 'Copy', hint: 'Ctrl+C', run: () => void copyFromMenu(false) },
+    { label: 'Paste', hint: 'Ctrl+V', run: () => void pasteFromMenu() },
+    { separator: true },
+    { label: 'Clear contents', hint: 'Delete', run: () => clearCells(rect) },
+    { separator: true },
+  ]
+}
+
 function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): MenuItem[] {
   const table = tab.doc.table
   const v = tab.view
@@ -843,12 +855,7 @@ function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): Menu
     const ids = v.visible.slice(rect.r0, rect.r1 + 1)
     const cols = rect.c1 - rect.c0 + 1
     return [
-      { label: 'Cut', hint: 'Ctrl+X', run: () => void copyFromMenu(true) },
-      { label: 'Copy', hint: 'Ctrl+C', run: () => void copyFromMenu(false) },
-      { label: 'Paste', hint: 'Ctrl+V', run: () => void pasteFromMenu() },
-      { separator: true },
-      { label: 'Clear contents', hint: 'Delete', run: () => clearCells(rect) },
-      { separator: true },
+      ...editItems(rect),
       { label: 'Insert row above', run: () => run(insertRows(table, table.indexOfRow(ids[0]!), 1)) },
       { label: 'Insert row below', run: () => run(insertRows(table, table.indexOfRow(ids[ids.length - 1]!) + 1, 1)) },
       { label: ids.length > 1 ? `Delete ${ids.length} rows` : 'Delete row', run: () => run(deleteRows(ids)) },
@@ -867,6 +874,7 @@ function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): Menu
     const [from, to] = grid.selectedRows()
     const ids = v.visible.slice(from, to + 1)
     return [
+      ...editItems(grid.selection()),
       { label: 'Insert row above', run: () => run(insertRows(table, table.indexOfRow(ids[0]!), 1)) },
       { label: 'Insert row below', run: () => run(insertRows(table, table.indexOfRow(ids[ids.length - 1]!) + 1, 1)) },
       { label: ids.length > 1 ? `Delete ${ids.length} rows` : 'Delete row', run: () => run(deleteRows(ids)) },
@@ -874,6 +882,7 @@ function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): Menu
   }
   const [from, to] = grid.selectedCols()
   return [
+    ...editItems(grid.selection()),
     { label: 'Insert column left', run: () => run(insertColumn(table, from)) },
     { label: 'Insert column right', run: () => run(insertColumn(table, to + 1)) },
     {
