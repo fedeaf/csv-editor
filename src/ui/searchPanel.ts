@@ -1,5 +1,5 @@
 export interface SearchPanelHandlers {
-  /** The text or the exact-match flag changed: search again from the first cell. */
+  /** The text or one of the options changed: search again from the first cell. */
   onSearch(): void
   onStep(direction: 1 | -1): void
   /** Replace the match that is selected, then move on to the next one. */
@@ -16,6 +16,8 @@ export interface SearchPanel {
   readonly isOpen: boolean
   readonly query: string
   readonly exact: boolean
+  /** The text to find is a regular expression. */
+  readonly regex: boolean
   readonly replacement: string
   /** `detail` is the longer text for the tooltip; by default the message itself. */
   setMessage(text: string, isError?: boolean, detail?: string): void
@@ -34,18 +36,20 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
     <div class="sp-row">
       <input type="text" class="sp-input" placeholder="Find in visible rows" aria-label="Find" spellcheck="false">
       <label class="sp-exact"><input type="checkbox"> Match entire cell</label>
+      <label class="sp-regex" title="Read the text as a regular expression (JavaScript syntax, ignoring case)"><input type="checkbox"> Regex</label>
       <span class="sp-message" aria-live="polite"></span>
       <button class="sp-next" title="Next match (Ctrl+G)">Next</button>
       <button class="sp-close" title="Close (Esc)" aria-label="Close">✕</button>
     </div>
     <div class="sp-row">
-      <input type="text" class="sp-replace" placeholder="Replace with" aria-label="Replace with" spellcheck="false">
+      <input type="text" class="sp-replace" placeholder="Replace with" aria-label="Replace with" spellcheck="false" title="With Regex on, $1, $&amp; and $&lt;name&gt; insert what the pattern matched">
       <button class="sp-replace-one" title="Replace this match and go to the next">Replace</button>
       <button class="sp-replace-all" title="Replace every match in the rows shown">Replace all</button>
     </div>`
   const $ = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector)!
   const input = $<HTMLInputElement>('.sp-input')
   const exact = $<HTMLInputElement>('.sp-exact input')
+  const regex = $<HTMLInputElement>('.sp-regex input')
   const message = $('.sp-message')
   const replaceInput = $<HTMLInputElement>('.sp-replace')
   const replaceButtons = [$('.sp-replace-one'), $('.sp-replace-all')] as HTMLButtonElement[]
@@ -78,6 +82,9 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
     get exact() {
       return exact.checked
     },
+    get regex() {
+      return regex.checked
+    },
     get replacement() {
       return replaceInput.value
     },
@@ -93,6 +100,7 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
     handlers.onSearch()
   })
   exact.addEventListener('change', () => handlers.onSearch())
+  regex.addEventListener('change', () => handlers.onSearch())
   $('.sp-next').addEventListener('click', () => handlers.onStep(1))
   $('.sp-replace-one').addEventListener('click', () => handlers.onReplace())
   $('.sp-replace-all').addEventListener('click', () => handlers.onReplaceAll())

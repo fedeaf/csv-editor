@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { fillCells, replaceCells, setCell } from './commands'
 import { History } from './history'
-import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, type SearchGrid } from './search'
+import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, patternError, type SearchGrid } from './search'
 import { Table } from './table'
 import { TableView } from './view'
 
@@ -287,5 +287,68 @@ describe('counting matches', () => {
     view.setFilter(t.colIds[0]!, { selected: new Set(['a']), duplicatesOnly: false })
     const shown: SearchGrid = { rowCount: view.rowCount, colCount: 2, cell: (r, c) => t.rowById(view.visible[r]!)!.cells[c]! }
     expect(findAllMatches(shown, 'hit', false)).toHaveLength(2)
+  })
+})
+
+describe('regular expressions', () => {
+  const re = { exact: false, regex: true }
+  const whole = { exact: true, regex: true }
+
+  it('reads the query as a pattern, ignoring case', () => {
+    const m = createMatcher('^a.a$', re)
+    expect(m.test('ANA')).toBe(true)
+    expect(m.test('Mariana')).toBe(false)
+    expect(createMatcher('\\d{3}-\\d{2}', re).test('ref 123-45')).toBe(true)
+    expect(createMatcher('^$', re).test('')).toBe(true)
+    expect(createMatcher('^$', re).test('x')).toBe(false)
+  })
+
+  it('lets the replacement use what the pattern matched', () => {
+    expect(createMatcher('(\\w+)@(\\w+)', re).replace('ana@host', '$2:$1')).toBe('host:ana')
+    expect(createMatcher('\\d+', re).replace('a1b22', '<$&>')).toBe('a<1>b<22>')
+    expect(createMatcher('(?<k>\\d+)', re).replace('n42', '[$<k>]')).toBe('n[42]')
+    expect(createMatcher('x', re).replace('axb', '$$')).toBe('a$b')
+  })
+
+  it('with "entire cell" the pattern must match from end to end', () => {
+    const m = createMatcher('a|b', whole)
+    expect(m.test('a')).toBe(true)
+    expect(m.test('b')).toBe(true)
+    expect(m.test('ab')).toBe(false) // an alternative alone would match inside; the whole cell must be one
+    expect(createMatcher('(\\d)(\\d)', whole).replace('12', '$2$1')).toBe('21')
+    expect(createMatcher('\\d+', whole).replace('12 apples', 'n')).toBe('12 apples')
+  })
+
+  it('lets a dot cross the line breaks of a multi-line cell', () => {
+    expect(createMatcher('a.b', re).test('a\nb')).toBe(true)
+  })
+
+  it('accepts patterns the unicode mode refuses, such as an escaped dash', () => {
+    expect(createMatcher('a\\-b', re).test('a-b')).toBe(true)
+    expect(createMatcher('\\p{L}+', re).test('日本')).toBe(true)
+  })
+
+  it('finds, counts and replaces through the same pattern', () => {
+    const g = grid([['a1', 'b'], ['c22', 'd']])
+    expect(findMatch(g, '\\d+', re)).toEqual({ row: 0, col: 0 })
+    expect(findAllMatches(g, '\\d+', re)).toEqual([0, 2])
+    expect(findReplacements(g, '(\\d+)', re, '#$1')).toEqual([
+      { row: 0, col: 0, value: 'a#1' },
+      { row: 1, col: 0, value: 'c#22' },
+    ])
+  })
+
+  it('says why a pattern is not valid, and only when it is read as one', () => {
+    expect(patternError('(', true)).toMatch(/unterminated group|parenthes/i)
+    expect(patternError('[a-', true)).toBeDefined()
+    expect(patternError('*a', true)).toBeDefined()
+    expect(patternError('a+', true)).toBeUndefined()
+    expect(patternError('(', false)).toBeUndefined()
+    expect(patternError('', true)).toBeUndefined()
+    expect(() => createMatcher('(', re)).toThrow()
+  })
+
+  it('a plain search is unchanged by the option being off', () => {
+    expect(createMatcher('a.b', { exact: false, regex: false }).test('axb')).toBe(false)
   })
 })

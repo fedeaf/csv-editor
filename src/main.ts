@@ -6,7 +6,7 @@ import { DELIMITER_NAMES, encodingLabel } from './model/formatOptions'
 import { History, type Outcome } from './model/history'
 import type { FileFormat } from './model/table'
 import { nextErrorRow } from './model/errors'
-import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, type Position, type SearchGrid } from './model/search'
+import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, patternError, type Position, type SearchGrid } from './model/search'
 import { TableView, uniqueValues, type ColumnFilter } from './model/view'
 import { closeContextMenu, showContextMenu, type MenuItem } from './ui/contextMenu'
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
@@ -39,7 +39,7 @@ interface Tab {
   /** Goes up whenever the cells or the rows shown change; the match list below is only good for one value of it. */
   version: number
   /** Every match of the current search, kept so that stepping from one to the next only has to look up a number. */
-  matches: { query: string; exact: boolean; version: number; list: number[] } | undefined
+  matches: { query: string; exact: boolean; regex: boolean; version: number; list: number[] } | undefined
   /** Scroll and selection to restore when the tab is selected again. */
   state: GridState | undefined
 }
@@ -632,12 +632,24 @@ function searchGrid(tab: Tab): SearchGrid {
 }
 
 /** All the matches of the search, counted once and reused until the cells or the rows shown change. */
-function matchesOf(tab: Tab, query: string, exact: boolean): number[] {
+function matchesOf(tab: Tab, query: string, mode: { exact: boolean; regex: boolean }): number[] {
   const cached = tab.matches
-  if (cached && cached.query === query && cached.exact === exact && cached.version === tab.version) return cached.list
-  const list = findAllMatches(searchGrid(tab), query, exact)
-  tab.matches = { query, exact, version: tab.version, list }
+  if (cached && cached.query === query && cached.exact === mode.exact && cached.regex === mode.regex && cached.version === tab.version) return cached.list
+  const list = findAllMatches(searchGrid(tab), query, mode)
+  tab.matches = { query, ...mode, version: tab.version, list }
   return list
+}
+
+/** How the Find panel asks to read the text to find. */
+function searchMode(): { exact: boolean; regex: boolean } {
+  return { exact: search.exact, regex: search.regex }
+}
+
+/** Says so in the panel and returns true when the text is a regular expression that is not valid. */
+function invalidPattern(query: string): boolean {
+  const error = patternError(query, search.regex)
+  if (error !== undefined) search.setMessage('Invalid pattern', true, `Invalid regular expression: ${error}`)
+  return error !== undefined
 }
 
 /**
@@ -652,13 +664,17 @@ function find(mode: 'first' | 'next' | 'previous'): boolean {
     search.setMessage('')
     return false
   }
+  if (invalidPattern(query)) {
+    tab.lastMatch = undefined
+    return false
+  }
   grid.commitEdit()
   const { table } = tab.doc
   const v = tab.view
   const match = findMatch(
     searchGrid(tab),
     query,
-    search.exact,
+    searchMode(),
     mode === 'first' ? undefined : tab.lastMatch,
     mode === 'previous' ? -1 : 1,
   )
@@ -669,7 +685,7 @@ function find(mode: 'first' | 'next' | 'previous'): boolean {
   }
   tab.lastMatch = match
   grid.setActive(match.row, match.col)
-  const list = matchesOf(tab, query, search.exact)
+  const list = matchesOf(tab, query, searchMode())
   const number = matchNumber(list, match, table.columnCount).toLocaleString('en-US')
   const total = list.length.toLocaleString('en-US')
   const name = table.headers[match.col] || `column ${match.col + 1}`
@@ -685,14 +701,14 @@ function find(mode: 'first' | 'next' | 'previous'): boolean {
 function replaceCurrent(): void {
   const tab = current
   const query = search.query
-  if (!tab || query === '') return
+  if (!tab || query === '' || invalidPattern(query)) return
   grid.commitEdit()
   const { table } = tab.doc
   const { row, col } = grid.activeCell
   const rowId = tab.view.idAt(row)
   let replaced = false
   if (rowId !== undefined) {
-    const matcher = createMatcher(query, search.exact)
+    const matcher = createMatcher(query, searchMode())
     const value = table.rowById(rowId)!.cells[col]!
     if (matcher.test(value)) {
       const command = replaceCells(table, [{ rowId, col, value: matcher.replace(value, search.replacement) }])
@@ -709,14 +725,14 @@ function replaceCurrent(): void {
 function replaceAll(): void {
   const tab = current
   const query = search.query
-  if (!tab || query === '') return
+  if (!tab || query === '' || invalidPattern(query)) return
   grid.commitEdit()
   const { table } = tab.doc
   const v = tab.view
   const shown = searchGrid(tab)
-  const changes = findReplacements(shown, query, search.exact, search.replacement)
+  const changes = findReplacements(shown, query, searchMode(), search.replacement)
   if (changes.length === 0) {
-    const anyMatch = findMatch(shown, query, search.exact)
+    const anyMatch = findMatch(shown, query, searchMode())
     search.setMessage(anyMatch ? 'Nothing to change' : 'No matches', !anyMatch)
     return
   }
