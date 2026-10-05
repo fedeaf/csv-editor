@@ -78,16 +78,24 @@ export function createTabBar(host: HTMLElement, handlers: TabBarHandlers): { ren
           tab.dataset.id = String(item.id)
           tab.setAttribute('role', 'tab')
           tab.setAttribute('aria-selected', String(item.active))
-          tab.title = item.label
+          tab.title = item.dirty ? `${item.label} (unsaved changes)` : item.label
           const name = document.createElement('span')
           name.className = 'tab-name'
-          name.textContent = item.dirty ? `* ${item.label}` : item.label
+          name.textContent = item.label
           const close = document.createElement('button')
           close.className = 'tab-close'
           close.tabIndex = -1
           close.title = 'Close'
           close.setAttribute('aria-label', `Close ${item.label}`)
           close.textContent = '×'
+          if (item.dirty) {
+            // A coloured dot ahead of the name: unsaved changes.
+            const dot = document.createElement('span')
+            dot.className = 'tab-dirty'
+            dot.setAttribute('role', 'img')
+            dot.setAttribute('aria-label', 'Unsaved changes')
+            tab.append(dot)
+          }
           tab.append(name, close)
           return tab
         }),

@@ -103,6 +103,10 @@ function createPane(): Pane {
     focusPane(pane)
     Promise.resolve(actions.open!()).catch(report)
   })
+  el.querySelector('.empty-new')!.addEventListener('click', () => {
+    focusPane(pane)
+    newDocument()
+  })
   panes.push(pane)
   $('panes').append(el)
   return pane
@@ -688,6 +692,7 @@ function find(mode: 'first' | 'next' | 'previous'): boolean {
   }
   tab.lastMatch = match
   grid.setActive(match.row, match.col)
+  grid.flashActive()
   const list = matchesOf(tab, query, searchMode())
   const number = matchNumber(list, match, table.columnCount).toLocaleString('en-US')
   const total = list.length.toLocaleString('en-US')
@@ -770,6 +775,7 @@ function goToError(col: number): void {
   }
   tab.lastError = { colId, row: stop.row }
   grid.setActive(stop.row, col)
+  grid.flashActive()
   grid.focus()
   const name = table.headers[col] || `column ${col + 1}`
   showMeta(`Warning ${stop.index} of ${stop.total} in "${name}": ${cell(stop.row).trim()}${stop.wrapped ? ' (back at the first)' : ''}`, true)

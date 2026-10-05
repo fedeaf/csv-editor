@@ -289,6 +289,22 @@ export class Grid {
     this.paint()
   }
 
+  /** Draws the eye to the active cell for a moment, after a jump to it (Find, the warning of a header). */
+  flashActive(): void {
+    const { row, col } = this.active
+    // The cell may not be in the page yet if the jump scrolled far; the rows are drawn on the next frame.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const cell = this.rendered.get(row)?.children[col + 1] as HTMLElement | undefined
+        if (!cell) return
+        cell.classList.remove('flash')
+        void cell.offsetWidth // restarts the animation when it was already running
+        cell.classList.add('flash')
+        cell.addEventListener('animationend', () => cell.classList.remove('flash'), { once: true })
+      }),
+    )
+  }
+
   /** Selects every cell, as Ctrl+A and a click on the corner do; the view stays where it is. */
   selectAll(): void {
     const model = this.model

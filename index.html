@@ -50,7 +50,17 @@
               </svg>
               <h1>Open a CSV file</h1>
               <p>Drop one or more <b>.csv</b> files anywhere in this window, or choose them yourself.</p>
-              <button class="primary-button empty-open">Open file…</button>
+              <div class="empty-actions">
+                <button class="primary-button empty-open">Open file…</button>
+                <button class="secondary-button empty-new">New blank document</button>
+              </div>
+              <dl class="empty-keys">
+                <div><dt><kbd>Ctrl</kbd> <kbd>S</kbd></dt><dd>Save</dd></div>
+                <div><dt><kbd>Ctrl</kbd> <kbd>F</kbd></dt><dd>Find and replace</dd></div>
+                <div><dt><kbd>Ctrl</kbd> <kbd>Z</kbd> / <kbd>Y</kbd></dt><dd>Undo / redo</dd></div>
+                <div><dt><kbd>Ctrl</kbd> <kbd>C</kbd> / <kbd>V</kbd></dt><dd>Copy / paste</dd></div>
+                <div><dt><kbd>F2</kbd></dt><dd>Edit a cell</dd></div>
+              </dl>
               <p class="empty-hint">The encoding and the delimiter are detected for you. Your files stay on this computer.</p>
             </div>
           </div>

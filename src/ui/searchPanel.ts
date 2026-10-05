@@ -35,10 +35,9 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
   root.innerHTML = `
     <div class="sp-grip" title="Drag to move. Double-click to put it back."></div>
     <div class="sp-row">
-      <input type="text" class="sp-input" placeholder="Find in visible rows" aria-label="Find" spellcheck="false">
+      <span class="sp-field"><input type="text" class="sp-input" placeholder="Find in visible rows" aria-label="Find" spellcheck="false"><span class="sp-message" aria-live="polite"></span></span>
       <label class="sp-exact"><input type="checkbox"> Match entire cell</label>
       <label class="sp-regex" title="Read the text as a regular expression (JavaScript syntax, ignoring case)"><input type="checkbox"> Regex</label>
-      <span class="sp-message" aria-live="polite"></span>
       <button class="sp-next" title="Next match (Ctrl+G)">Next</button>
       <button class="sp-close" title="Close (Esc)" aria-label="Close">✕</button>
     </div>
@@ -140,6 +139,7 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
       message.textContent = text
       message.title = detail ?? text // the full text, in case a narrow window cuts it short
       message.classList.toggle('error', isError)
+      input.classList.toggle('invalid', isError) // the field itself turns red, not only the words
     },
   }
 
