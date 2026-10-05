@@ -9,6 +9,8 @@ export interface Row {
 
 export interface FileFormat extends Detected, Pick<ParsedCsv, 'lineEnding' | 'trailingNewline'> {
   delimiter: Delimiter
+  /** On save, every field with content goes between quotes (the header as it arrived). */
+  quoteAll: boolean
 }
 
 /** A row and the position it occupies in the table order. */

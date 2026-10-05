@@ -41,3 +41,8 @@ export const LINE_ENDING_OPTIONS: { value: LineEnding; label: string }[] = [
   { value: '\n', label: 'LF (Linux, macOS)' },
   { value: '\r\n', label: 'CRLF (Windows)' },
 ]
+
+export const QUOTING_OPTIONS: { value: 'needed' | 'all'; label: string }[] = [
+  { value: 'needed', label: 'Only where needed' },
+  { value: 'all', label: 'Every field with content' },
+]

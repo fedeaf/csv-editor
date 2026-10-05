@@ -537,7 +537,7 @@ function showMeta(message?: string, neutral = false): void {
 }
 
 /** After a command ran, was undone or redone: refresh statistics, filters and grid, then place the cursor. */
-function applyOutcome(tab: Tab, { command, cursor }: Outcome): void {
+function applyOutcome(tab: Tab, { command, cursor }: Outcome, message?: string): void {
   tab.lastError = undefined // rows may have moved or errors been fixed: the next walk starts from the top
   tab.version++
   tab.view.stats.invalidate(command.invalidates)
@@ -547,21 +547,27 @@ function applyOutcome(tab: Tab, { command, cursor }: Outcome): void {
   const at = target.rowId === undefined ? -1 : tab.view.indexOfId(target.rowId)
   const active = grid.activeCell
   grid.setActive(at >= 0 ? at : active.row, target.col ?? active.col)
-  showMeta()
+  showMeta(message)
 }
 
 function run(command: Command): void {
   if (current) applyOutcome(current, current.history.execute(command, current.doc.table))
 }
 
+/** Undo and redo say what they undid or redid, since the change may be out of sight. */
 function undo(): void {
-  const outcome = current?.history.undo(current.doc.table)
-  if (current && outcome) applyOutcome(current, outcome)
+  const tab = current
+  if (!tab) return
+  const outcome = tab.history.undo(tab.doc.table)
+  if (outcome) applyOutcome(tab, outcome, `Undone: ${outcome.command.label}`)
+  else showMeta('Nothing to undo', true)
 }
-
 function redo(): void {
-  const outcome = current?.history.redo(current.doc.table)
-  if (current && outcome) applyOutcome(current, outcome)
+  const tab = current
+  if (!tab) return
+  const outcome = tab.history.redo(tab.doc.table)
+  if (outcome) applyOutcome(tab, outcome, `Redone: ${outcome.command.label}`)
+  else showMeta('Nothing to redo', true)
 }
 
 // --- fill (REL-01 to REL-05) ---------------------------------------------------------------
@@ -604,7 +610,7 @@ function cellsIn(tab: Tab, rect: Rect): { rowId: number; col: number }[] {
 /** Delete over a selection empties every cell in it, as one undo step. */
 function clearCells(rect: Rect): void {
   if (!current) return
-  const command = fillCells(current.doc.table, cellsIn(current, rect), '')
+  const command = fillCells(current.doc.table, cellsIn(current, rect), '', 'Clear contents')
   if (command) run(command)
 }
 
@@ -691,7 +697,7 @@ function pasteText(text: string): boolean {
   const colsBefore = table.columnCount
 
   if (height === 1 && width === 1 && (rect.r1 > rect.r0 || rect.c1 > rect.c0)) {
-    const command = fillCells(table, cellsIn(tab, rect), block[0]![0]!)
+    const command = fillCells(table, cellsIn(tab, rect), block[0]![0]!, 'Paste')
     if (command) run(command)
     showMeta(`Pasted into ${plural((rect.r1 - rect.r0 + 1) * (rect.c1 - rect.c0 + 1), 'cell')}`)
     return true
@@ -977,7 +983,7 @@ async function saveTab(tab: Tab, as: boolean): Promise<boolean> {
 
 /** True when two formats write a document the same way. */
 const sameFormat = (a: FileFormat, b: FileFormat) =>
-  a.encoding === b.encoding && a.bom === b.bom && a.delimiter === b.delimiter && a.lineEnding === b.lineEnding
+  a.encoding === b.encoding && a.bom === b.bom && a.delimiter === b.delimiter && a.lineEnding === b.lineEnding && a.quoteAll === b.quoteAll
 
 /**
  * The File Format dialog. "Reload file" reads the file again with the encoding and delimiter chosen,
@@ -990,7 +996,7 @@ async function chooseFormat(): Promise<void> {
   grid.commitEdit()
   const answer = await formatDialog(tab.doc.name, tab.doc.format, !!(tab.doc.handle || tab.doc.source))
   if (!answer || !tabs.includes(tab)) return
-  const describe = (f: FileFormat) => `${encodingLabel(f)}, ${DELIMITER_NAMES[f.delimiter]}-delimited`
+  const describe = (f: FileFormat) => `${encodingLabel(f)}, ${DELIMITER_NAMES[f.delimiter]}-delimited${f.quoteAll ? ', all fields quoted' : ''}`
   if (answer.action === 'save') {
     if (sameFormat(answer.format, tab.doc.format)) return showMeta('The format is already that one', true)
     applyOutcome(tab, tab.history.execute(changeFormat(tab.doc, answer.format), tab.doc.table))

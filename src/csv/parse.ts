@@ -11,6 +11,8 @@ export interface ParsedCsv {
   lineEnding: LineEnding
   /** Whether the file ended with a line break, kept so the save matches. */
   trailingNewline: boolean
+  /** For each field of the header line, whether the file wrote it between quotes. */
+  headerQuoted: boolean[]
   warnings: string[]
 }
 
@@ -33,6 +35,32 @@ export function detectDelimiter(text: string): Delimiter {
   return best
 }
 
+/**
+ * Which fields of the first line are written between quotes. Papa Parse does not say, and a header
+ * that arrived quoted is written back that way when every field is quoted.
+ */
+export function firstLineQuotes(text: string, delimiter: Delimiter): boolean[] {
+  const quoted: boolean[] = []
+  let i = 0
+  for (;;) {
+    const isQuoted = text[i] === '"'
+    quoted.push(isQuoted)
+    if (isQuoted) {
+      i++
+      while (i < text.length) {
+        if (text[i] === '"') {
+          if (text[i + 1] === '"') i += 2
+          else break
+        } else i++
+      }
+      i++ // the closing quote
+    }
+    while (i < text.length && text[i] !== delimiter && text[i] !== '\n' && text[i] !== '\r') i++
+    if (text[i] !== delimiter) return quoted
+    i++
+  }
+}
+
 /** `chosen` is a delimiter picked by the user; without it the delimiter is detected. */
 export function parseCsv(text: string, chosen?: Delimiter): ParsedCsv {
   const delimiter = chosen ?? detectDelimiter(text)
@@ -45,7 +73,7 @@ export function parseCsv(text: string, chosen?: Delimiter): ParsedCsv {
   const result = Papa.parse<string[]>(body, { delimiter, skipEmptyLines: false })
   const data = result.data
   if (data.length === 0 || (data.length === 1 && data[0]!.length === 1 && data[0]![0] === '')) {
-    return { headers: [], rows: [], delimiter, lineEnding, trailingNewline, warnings: ['The file is empty.'] }
+    return { headers: [], rows: [], delimiter, lineEnding, trailingNewline, headerQuoted: [], warnings: ['The file is empty.'] }
   }
 
   const headers = data[0]!
@@ -66,5 +94,5 @@ export function parseCsv(text: string, chosen?: Delimiter): ParsedCsv {
   while (headers.length < width) headers.push('')
   for (const row of rows) while (row.length < width) row.push('')
 
-  return { headers, rows, delimiter, lineEnding, trailingNewline, warnings }
+  return { headers, rows, delimiter, lineEnding, trailingNewline, headerQuoted: firstLineQuotes(body, delimiter), warnings }
 }

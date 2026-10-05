@@ -20,7 +20,7 @@ export interface FileInfo {
   /** Rows a filter leaves visible; omitted when nothing is filtered. */
   rowsShown?: number
   columns: number
-  format: Pick<FileFormat, 'encoding' | 'bom' | 'delimiter'>
+  format: Pick<FileFormat, 'encoding' | 'bom' | 'delimiter'> & { quoteAll?: boolean }
 }
 
 /** "Showing 5 of 7 rows × 4 columns · UTF-8 · comma-delimited". */
@@ -28,7 +28,7 @@ export function fileInfo({ rows, rowsShown, columns, format }: FileInfo): string
   const encoding = encodingLabel(format)
   const delimiter = DELIMITER_NAMES[format.delimiter]
   const rowText = rowsShown === undefined ? plural(rows, 'row') : `Showing ${rowsShown.toLocaleString('en-US')} of ${plural(rows, 'row')}`
-  return `${rowText} × ${plural(columns, 'column')} · ${encoding} · ${delimiter}-delimited`
+  return `${rowText} × ${plural(columns, 'column')} · ${encoding} · ${delimiter}-delimited${format.quoteAll ? ' · all fields quoted' : ''}`
 }
 
 const n = (count: number) => count.toLocaleString('en-US')

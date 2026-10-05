@@ -2,7 +2,7 @@
 // what each button does, and never leave the page.
 
 import type { Delimiter, LineEnding } from '../csv/parse'
-import { DELIMITER_OPTIONS, ENCODING_OPTIONS, LINE_ENDING_OPTIONS, encodingOption } from '../model/formatOptions'
+import { DELIMITER_OPTIONS, ENCODING_OPTIONS, LINE_ENDING_OPTIONS, QUOTING_OPTIONS, encodingOption } from '../model/formatOptions'
 import type { FileFormat } from '../model/table'
 
 export interface DialogOptions {
@@ -169,11 +169,12 @@ function renderFormat(name: string, current: FileFormat, canReload: boolean): Pr
     const encoding = select('Encoding', ENCODING_OPTIONS.map((o) => ({ value: o.key, label: o.label })), encodingOption(current).key)
     const delimiter = select('Delimiter', DELIMITER_OPTIONS, current.delimiter)
     const lineEnding = select('Line endings', LINE_ENDING_OPTIONS, current.lineEnding)
+    const quoting = select('Quotes', QUOTING_OPTIONS, current.quoteAll ? 'all' : 'needed')
 
     const note = document.createElement('p')
     note.className = 'format-note'
     note.textContent = canReload
-      ? '"Reload file" reads it again with this encoding and delimiter, and drops any unsaved changes. "Use when saving" keeps the data as it is and changes how the file is written, line endings included.'
+      ? '"Reload file" reads it again with this encoding and delimiter, and drops any unsaved changes. "Use when saving" keeps the data as it is and changes how the file is written, line endings and quotes included.'
       : 'This document is not a file yet. The choice is used when it is saved.'
 
     const actions = document.createElement('div')
@@ -194,6 +195,7 @@ function renderFormat(name: string, current: FileFormat, canReload: boolean): Pr
         bom: option.bom,
         delimiter: delimiter.value as Delimiter,
         lineEnding: lineEnding.value as LineEnding,
+        quoteAll: quoting.value === 'all',
       }
     }
     const close = (answer: FormatAnswer | undefined) => {

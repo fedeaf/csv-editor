@@ -165,14 +165,14 @@ export function sortRows(table: Table, col: number, dir: SortDirection): Command
  * Copies one value into many cells as a single step (REL-05). Cells already holding it are left
  * alone; returns undefined if nothing would change.
  */
-export function fillCells(table: Table, targets: { rowId: number; col: number }[], value: string): Command | undefined {
+export function fillCells(table: Table, targets: { rowId: number; col: number }[], value: string, label = 'Fill'): Command | undefined {
   const changes = targets
     .map((t) => ({ ...t, before: table.rowById(t.rowId)!.cells[t.col]! }))
     .filter((c) => c.before !== value)
   if (changes.length === 0) return undefined
   const columns = [...new Set(changes.map((c) => table.colIds[c.col]!))]
   return {
-    label: 'Fill',
+    label,
     invalidates: columns,
     run: (t) => {
       for (const c of changes) t.rowById(c.rowId)!.cells[c.col] = value

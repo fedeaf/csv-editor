@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { loadDocument, encodeDocument } from '../document'
 import { decode, detectEncoding, encode, unencodableChars } from './encoding'
-import { detectDelimiter, parseCsv } from './parse'
+import { detectDelimiter, firstLineQuotes, parseCsv } from './parse'
 import { serializeCsv } from './serialize'
 
 const bytes = (...n: number[]) => new Uint8Array(n)
@@ -193,5 +193,66 @@ describe('encoding and delimiter chosen by hand', () => {
   it('keeps the bytes of a document that has no file handle, to read them again', () => {
     expect(loadDocument('t.csv', utf8('a,b')).source).toEqual(utf8('a,b'))
     expect(loadDocument('t.csv', utf8('a,b'), {} as FileSystemFileHandle).source).toBeUndefined()
+  })
+})
+
+describe('saving with every field quoted', () => {
+  const quoted = (text: string) => {
+    const doc = loadDocument('t.csv', utf8(text))
+    doc.format = { ...doc.format, quoteAll: true }
+    return new TextDecoder().decode(encodeDocument(doc, () => false)!.bytes)
+  }
+
+  it('finds which fields of the first line arrived between quotes', () => {
+    expect(firstLineQuotes('a,"b",c', ',')).toEqual([false, true, false])
+    expect(firstLineQuotes('"a","b"', ',')).toEqual([true, true])
+    expect(firstLineQuotes('a;"b;c";d\n"x";y', ';')).toEqual([false, true, false])
+    expect(firstLineQuotes('"a ""quoted"" word",b', ',')).toEqual([true, false])
+    expect(firstLineQuotes('"two\nlines",b\n"x",y', ',')).toEqual([true, false])
+    expect(firstLineQuotes('a,,"c"', ',')).toEqual([false, false, true])
+    expect(firstLineQuotes('', ',')).toEqual([false])
+  })
+
+  it('writes the header as it arrived, whatever the other fields do', () => {
+    expect(quoted('a,"b",c\n1,2,3\n')).toBe('a,"b",c\n"1","2","3"\n')
+    expect(quoted('"a","b"\n1,2\n')).toBe('"a","b"\n"1","2"\n')
+  })
+
+  it('leaves empty cells empty, with no quotes', () => {
+    expect(quoted('a,b,c\n1,,3\n,,\nx,y,\n')).toBe('a,b,c\n"1",,"3"\n,,\n"x","y",\n')
+  })
+
+  it('quotes anything with content, spaces and numbers included, and doubles the quotes inside', () => {
+    expect(quoted('a,b\n 1 ,"say ""hi"""\n0,"x,y"\n')).toBe('a,b\n" 1 ","say ""hi"""\n"0","x,y"\n')
+    expect(quoted('a,b\n"line one\nline two",z\n')).toBe('a,b\n"line one\nline two","z"\n')
+  })
+
+  it('still quotes a header that cannot be written without quotes', () => {
+    const doc = loadDocument('t.csv', utf8('a,b\n1,2\n'))
+    doc.table.headers[0] = 'x,y'
+    doc.format = { ...doc.format, quoteAll: true }
+    expect(new TextDecoder().decode(encodeDocument(doc, () => false)!.bytes)).toBe('"x,y",b\n"1","2"\n')
+  })
+
+  it('keeps a row of a single empty column from vanishing', () => {
+    expect(quoted('a\n1\n\n2\n')).toBe('a\n"1"\n""\n"2"\n')
+  })
+
+  it('keeps the style of a header when the column is renamed', () => {
+    const doc = loadDocument('t.csv', utf8('"a",b\n1,2\n'))
+    doc.format = { ...doc.format, quoteAll: true }
+    expect(new TextDecoder().decode(encodeDocument(doc, () => false)!.bytes)).toBe('"a",b\n"1","2"\n')
+  })
+
+  it('quotes nothing more than before when the option is off', () => {
+    const doc = loadDocument('t.csv', utf8('"a",b\n1,2\n'))
+    expect(new TextDecoder().decode(encodeDocument(doc, () => false)!.bytes)).toBe('a,b\n1,2\n')
+  })
+
+  it('reads the quoted file back as the same table', () => {
+    const text = quoted('a,b\n1,\n"x ""y"" z",\n')
+    const again = loadDocument('t.csv', utf8(text))
+    expect(again.table.headers).toEqual(['a', 'b'])
+    expect([...again.table.orderedCells()]).toEqual([['1', ''], ['x "y" z', '']])
   })
 })

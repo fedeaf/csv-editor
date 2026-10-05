@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changeFormat, deleteColumns, deleteRows, insertColumn, insertRows, renameHeader, setCell } from './commands'
+import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, renameHeader, setCell } from './commands'
 import { History } from './history'
 import { Table, type FileFormat } from './table'
 
@@ -138,5 +138,27 @@ describe('changeFormat', () => {
     history.undo(table)
     expect(doc.format.delimiter).toBe(',')
     expect(history.dirty).toBe(false)
+  })
+})
+
+describe('the names that undo and redo report', () => {
+  it('say what each operation is, so the status bar can name it', () => {
+    const table = make()
+    const labels = [
+      setCell(table, table.order[0]!, 0, 'x').label,
+      renameHeader(table, 0, 'z').label,
+      insertRows(table, 0, 1).label,
+      insertRows(table, 0, 3).label,
+      deleteRows([table.order[0]!]).label,
+      insertColumn(table, 0).label,
+      deleteColumns(0, 0).label,
+    ]
+    expect(labels).toEqual(['Edit cell', 'Rename header', 'Insert row', 'Insert rows', 'Delete row', 'Insert column', 'Delete column'])
+  })
+  it('let a fill be called by what the user did', () => {
+    const table = make()
+    const targets = [{ rowId: table.order[0]!, col: 0 }]
+    expect(fillCells(table, targets, 'q')!.label).toBe('Fill')
+    expect(fillCells(table, targets, 'q', 'Clear contents')!.label).toBe('Clear contents')
   })
 })

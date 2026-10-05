@@ -8,6 +8,8 @@ export interface CsvDocument {
   table: Table
   format: FileFormat
   handle?: FileSystemFileHandle
+  /** The columns (by id) whose header the file wrote between quotes. */
+  quotedHeaders: Set<number>
   /** The bytes read, kept only when there is no file handle to read them from again. */
   source?: Uint8Array
   warnings: string[]
@@ -19,15 +21,18 @@ export type ChosenFormat = Pick<FileFormat, 'encoding' | 'bom' | 'delimiter'>
 export function loadDocument(name: string, bytes: Uint8Array, handle?: FileSystemFileHandle, chosen?: ChosenFormat): CsvDocument {
   const encoding = chosen ?? detectEncoding(bytes)
   const parsed = parseCsv(decode(bytes, encoding), chosen?.delimiter)
+  const table = new Table(parsed.headers, parsed.rows)
   return {
     name,
-    table: new Table(parsed.headers, parsed.rows),
+    table,
+    quotedHeaders: new Set(table.colIds.filter((_, i) => parsed.headerQuoted[i])),
     format: {
       encoding: encoding.encoding,
       bom: encoding.bom,
       delimiter: parsed.delimiter,
       lineEnding: parsed.lineEnding,
       trailingNewline: parsed.trailingNewline,
+      quoteAll: false,
     },
     handle,
     source: handle ? undefined : bytes,
@@ -56,7 +61,8 @@ export function blankDocument(name: string): CsvDocument {
   return {
     name,
     table: new Table(row(), Array.from({ length: BLANK_ROWS }, row)),
-    format: { encoding: 'utf-8', bom: false, delimiter: ',', lineEnding: '\n', trailingNewline: true },
+    quotedHeaders: new Set(),
+    format: { encoding: 'utf-8', bom: false, delimiter: ',', lineEnding: '\n', trailingNewline: true, quoteAll: false },
     warnings: [],
   }
 }
@@ -66,7 +72,7 @@ export function blankDocument(name: string): CsvDocument {
  * with content. Empty columns and the empty rows at the end are left out, so a blank document
  * writes no bytes at all. Empty rows between rows with content stay, to keep the rows in place.
  */
-export function contentToWrite(table: Table): { headers: string[]; rows: string[][] } {
+export function contentToWrite(table: Table): { headers: string[]; rows: string[][]; keep: number[] } {
   const used = table.headers.map((h) => h !== '')
   const all = [...table.orderedCells()]
   let last = -1
@@ -81,14 +87,16 @@ export function contentToWrite(table: Table): { headers: string[]; rows: string[
   return {
     headers: keep.map((c) => table.headers[c]!),
     rows: all.slice(0, last + 1).map((cells) => keep.map((c) => cells[c]!)),
+    keep,
   }
 }
 
 export function serializeDocument(doc: CsvDocument): string {
-  const { delimiter, lineEnding, trailingNewline } = doc.format
-  const { headers, rows } = contentToWrite(doc.table)
+  const { delimiter, lineEnding, trailingNewline, quoteAll } = doc.format
+  const { headers, rows, keep } = contentToWrite(doc.table)
   if (headers.length === 0) return ''
-  return serializeCsv(headers, rows, { delimiter, lineEnding, trailingNewline })
+  const quotedHeaders = keep.map((c) => doc.quotedHeaders.has(doc.table.colIds[c]!))
+  return serializeCsv(headers, rows, { delimiter, lineEnding, trailingNewline, quoteAll, quotedHeaders })
 }
 
 export interface Encoded {
