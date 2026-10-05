@@ -14,7 +14,8 @@ import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
 import { Grid, type FillRequest, type GridHandlers, type GridModel, type GridState, type Rect } from './ui/grid'
 import { confirmDialog, formatDialog, isDialogOpen, messageDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
-import { fileInfo, plural, selectionSummary } from './ui/status'
+import { createAccumulator, type Summary } from './model/summary'
+import { fileInfo, plural, selectionSummary, summaryText } from './ui/status'
 import { currentTheme, toggleTheme, watchTheme } from './ui/theme'
 import { createDivider } from './ui/splitDivider'
 import { createTabBar, tabAfterClose } from './ui/tabBar'
@@ -326,14 +327,78 @@ function setStatusMessage(text: string | undefined, neutral = false): void {
   }
 }
 
-/** Left side of the status bar: the message of the last action while it lasts, else the selection. */
+/** What the selected cells hold, once counted; `key` says which selection and which state of the cells it is for. */
+let selectionStats: { key: string; summary: Summary } | undefined
+let summaryToken = 0
+let summaryTimer: number | undefined
+const SYNC_CELLS = 5000 // up to here the count is made on the spot, with no pause
+
+/**
+ * Counts the cells of `rect`. A big selection is counted a slice at a time so the page stays usable,
+ * and a new selection (or a change in the cells) abandons the count in progress.
+ */
+function summarize(tab: Tab, rect: Rect, key: string): void {
+  const token = ++summaryToken
+  window.clearTimeout(summaryTimer)
+  const acc = createAccumulator()
+  const table = tab.doc.table
+  let row = rect.r0
+  const slice = (budget: number) => {
+    const started = performance.now()
+    while (row <= rect.r1 && performance.now() - started < budget) {
+      const cells = table.rowById(tab.view.visible[row++]!)!.cells
+      for (let c = rect.c0; c <= rect.c1; c++) acc.add(cells[c] ?? '')
+    }
+  }
+  const finish = () => {
+    selectionStats = { key, summary: acc.result() }
+  }
+  if ((rect.r1 - rect.r0 + 1) * (rect.c1 - rect.c0 + 1) <= SYNC_CELLS) {
+    slice(Infinity)
+    return finish() // the caller is showing the status bar and picks the result up
+  }
+  const step = () => {
+    if (token !== summaryToken) return
+    slice(12)
+    if (row <= rect.r1) {
+      summaryTimer = window.setTimeout(step)
+    } else {
+      finish()
+      if (tab === current) showActivity()
+    }
+  }
+  summaryTimer = window.setTimeout(step, 100) // not while the selection is still being dragged out
+}
+
+/** Left side of the status bar: the message of the last action while it lasts, else the selection and what it holds. */
 function showActivity(): void {
   const activity = $('status-activity')
-  const text = statusMessage?.text ?? (current ? selectionSummary(grid.selection(), current.view.rowCount) : '')
+  let text = statusMessage?.text ?? ''
+  let detail = ''
+  if (!statusMessage && current) {
+    const rect = grid.selection()
+    text = selectionSummary(rect, current.view.rowCount)
+    if (text) {
+      const key = `${current.id}:${current.version}:${rect.r0},${rect.r1},${rect.c0},${rect.c1}`
+      if (selectionStats?.key !== key && key !== pendingKey) {
+        pendingKey = key
+        summarize(current, rect, key)
+      }
+      if (selectionStats?.key === key) {
+        const stats = summaryText(selectionStats.summary)
+        text += ` · ${stats.text}`
+        detail = stats.detail
+      }
+    }
+  }
   activity.textContent = text
+  activity.title = detail
   activity.classList.toggle('message', !!statusMessage)
   activity.classList.toggle('neutral', !!statusMessage?.neutral)
 }
+
+/** The selection being counted now, so that showing the status bar again does not start the count over. */
+let pendingKey = ''
 
 /**
  * Tab strip, window title, status bar and menu state, all for the tab in focus. A `message` is the
