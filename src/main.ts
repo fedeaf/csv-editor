@@ -42,6 +42,8 @@ interface Tab {
   matches: { query: string; exact: boolean; regex: boolean; version: number; list: number[] } | undefined
   /** Scroll and selection to restore when the tab is selected again. */
   state: GridState | undefined
+  /** In a side-by-side split, the strip (and pane) it belongs to: 0 for the left one, 1 for the right one. */
+  side: 0 | 1
 }
 
 const tabs: Tab[] = []
@@ -107,6 +109,7 @@ function createPane(): Pane {
     focusPane(pane)
     newDocument()
   })
+  new ResizeObserver(alignStrips).observe(el)
   panes.push(pane)
   $('panes').append(el)
   return pane
@@ -139,11 +142,65 @@ focused = createPane()
 grid = focused.grid
 focused.el.classList.add('focused')
 
-const tabBar = createTabBar($('tabs'), {
-  onSelect: (id) => activate(tabs.find((t) => t.id === id)),
-  onClose: (id) => void closeTab(tabs.find((t) => t.id === id)),
-  onNew: () => newDocument(),
-})
+/**
+ * Side by side, each pane has a strip of tabs of its own above it, the right one starting where its
+ * pane starts. Every other layout has the one strip, with all the tabs.
+ */
+const strips = ([0, 1] as const).map((side) =>
+  createTabBar($(side === 0 ? 'tabs' : 'tabs-right'), {
+    onSelect: (id) => activate(tabs.find((t) => t.id === id)),
+    onClose: (id) => void closeTab(tabs.find((t) => t.id === id)),
+    onNew: () => {
+      if (layout === 'side' && panes[side]) focusPane(panes[side]!)
+      newDocument()
+    },
+    onMenu: (id, x, y) => {
+      const tab = tabs.find((t) => t.id === id)
+      if (tab) showContextMenu(x, y, tabItems(tab))
+    },
+    onDropTab: (id) => {
+      const tab = tabs.find((t) => t.id === id)
+      if (tab) moveTab(tab, side)
+    },
+    draggable: () => layout === 'side',
+  }),
+)
+
+/** The right-click menu of a tab. */
+function tabItems(tab: Tab): MenuItem[] {
+  const items: MenuItem[] = []
+  if (layout === 'side') {
+    items.push({ label: tab.side === 0 ? 'Move to the right panel' : 'Move to the left panel', run: () => moveTab(tab, tab.side === 0 ? 1 : 0) })
+    items.push({ separator: true })
+  }
+  items.push({ label: 'Close', run: () => void closeTab(tab) })
+  return items
+}
+
+/**
+ * Side by side: moves a tab to the strip of the other pane and shows it there. The pane it leaves shows
+ * its neighbour in the strip, or the start screen if there is none.
+ */
+function moveTab(tab: Tab, side: 0 | 1): void {
+  if (layout !== 'side' || tab.side === side) return
+  const from = panes[tab.side]
+  const group = tabs.filter((t) => t.side === tab.side)
+  const nextId = tabAfterClose(group.map((t) => t.id), tab.id, tab.id)
+  tab.side = side
+  if (from?.tab === tab) {
+    showIn(from, tabs.find((t) => t.id === nextId && t !== tab))
+    if (from === focused) current = from.tab
+  }
+  activate(tab)
+}
+
+/** Keeps the right strip exactly above the right pane. */
+function alignStrips(): void {
+  const right = $('tabs-right')
+  const second = layout === 'side' ? panes[1] : undefined
+  right.hidden = !second
+  right.style.width = second ? `${second.el.getBoundingClientRect().width}px` : ''
+}
 
 /** The grid reads the view live, so a refresh is enough after any change. */
 function modelFor(v: TableView): GridModel {
@@ -196,6 +253,7 @@ function showIn(pane: Pane, tab: Tab | undefined, fresh = false): void {
   if (tab && fresh) tab.state = undefined
   else if (pane.tab) pane.tab.state = pane.grid.saveState()
   pane.tab = tab
+  if (tab && layout === 'side') tab.side = panes.indexOf(pane) as 0 | 1
   if (pane === focused) current = tab
   pane.grid.setModel(tab && modelFor(tab.view), tab?.state)
   pane.empty.hidden = !!tab
@@ -212,11 +270,15 @@ function otherTab(): Tab | undefined {
 
 /** Brings a tab into focus, in the pane in focus; if the other pane already shows it, that pane is the one focused. */
 function activate(tab: Tab | undefined): void {
-  const elsewhere = tab && panes.find((p) => p !== focused && p.tab === tab)
-  if (elsewhere) {
-    focusPane(elsewhere)
-    grid.focus()
-    return
+  // Side by side a tab belongs to one pane, and selecting it goes there; otherwise it goes to the pane in
+  // focus, unless the other pane already shows it.
+  const home = tab && (layout === 'side' ? panes[tab.side] : panes.find((p) => p !== focused && p.tab === tab))
+  if (home && home !== focused) {
+    focusPane(home)
+    if (home.tab === tab) {
+      grid.focus()
+      return
+    }
   }
   if (tab === current) {
     grid.focus()
@@ -251,6 +313,9 @@ function setLayout(next: Layout): void {
   $('panes').className = next === 'single' ? '' : next
   divider.setOrientation(next === 'side')
   applyShare()
+  // Side by side, the tab each pane shows is in its strip.
+  if (next === 'side') panes.forEach((p, i) => p.tab && (p.tab.side = i as 0 | 1))
+  alignStrips()
   showMeta()
 }
 
@@ -274,6 +339,21 @@ async function closeTab(tab: Tab | undefined): Promise<void> {
       return
     }
   }
+  if (layout === 'side') {
+    // The pane that showed it goes on to the next tab of its own strip, or to the start screen.
+    const pane = panes.find((p) => p.tab === tab)
+    const group = tabs.filter((t) => t.side === tab.side)
+    const nextId = tabAfterClose(group.map((t) => t.id), tab.id, pane ? tab.id : undefined)
+    tabs.splice(tabs.indexOf(tab), 1)
+    const next = tabs.find((t) => t.id === nextId)
+    if (!pane) showMeta()
+    else if (pane === focused) activate(next)
+    else {
+      showIn(pane, next)
+      showMeta()
+    }
+    return
+  }
   const next = tabAfterClose(tabs.map((t) => t.id), tab.id, current?.id, otherTab()?.id)
   tabs.splice(tabs.indexOf(tab), 1)
   // In the other pane, a closed file gives way to one not shown yet, or to the start screen.
@@ -285,7 +365,7 @@ async function closeTab(tab: Tab | undefined): Promise<void> {
 }
 
 function addTab(doc: CsvDocument): Tab {
-  const tab: Tab = { id: nextTabId++, doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, version: 0, matches: undefined, state: undefined }
+  const tab: Tab = { id: nextTabId++, doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, version: 0, matches: undefined, state: undefined, side: (panes.indexOf(focused) === 1 ? 1 : 0) }
   tabs.push(tab)
   return tab
 }
@@ -412,7 +492,18 @@ let pendingKey = ''
  * result of an action ("Saved", "Pasted"); without one, any earlier message is cleared.
  */
 function showMeta(message?: string, neutral = false): void {
-  tabBar.render(tabs.map((t) => ({ id: t.id, label: t.doc.name, dirty: t.history.dirty, active: t === current, shown: t === otherTab() })))
+  if (layout === 'side') {
+    strips.forEach((strip, side) =>
+      strip.render(
+        tabs
+          .filter((t) => t.side === side)
+          .map((t) => ({ id: t.id, label: t.doc.name, dirty: t.history.dirty, active: t === panes[side]?.tab, dim: panes[side] !== focused })),
+      ),
+    )
+  } else {
+    strips[0]!.render(tabs.map((t) => ({ id: t.id, label: t.doc.name, dirty: t.history.dirty, active: t === current, shown: t === otherTab() })))
+    strips[1]!.render([])
+  }
   const tab = current
   // The browser tab keeps the name of the app whatever is open. Its asterisk (ARC-05) says that some
   // document has unsaved changes; which one is shown by the asterisk in the strip of tabs.

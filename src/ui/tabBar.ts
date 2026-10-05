@@ -5,6 +5,8 @@ export interface TabItem {
   active: boolean
   /** Shown in the other pane of a split view. */
   shown?: boolean
+  /** The selected tab of a strip whose pane is not in focus: selected, but without the mark of focus. */
+  dim?: boolean
 }
 
 export interface TabBarHandlers {
@@ -13,7 +15,15 @@ export interface TabBarHandlers {
   onClose(id: number): void
   /** The + after the last tab was clicked. */
   onNew(): void
+  /** A tab was right-clicked, at this position of the window. */
+  onMenu?(id: number, x: number, y: number): void
+  /** A tab from another strip was dropped on this one. */
+  onDropTab?(id: number): void
+  /** Whether tabs can be dragged out now (when there is another strip to take them). */
+  draggable?(): boolean
 }
+
+const TAB_MIME = 'application/x-csv-editor-tab'
 
 /** Which tab to show after `closingId` is closed: the right neighbour, else the left, else none. A tab `shownElsewhere` (in the other pane) is skipped. */
 export function tabAfterClose(ids: number[], closingId: number, activeId: number | undefined, shownElsewhere?: number): number | undefined {
@@ -51,6 +61,34 @@ export function createTabBar(host: HTMLElement, handlers: TabBarHandlers): { ren
   host.addEventListener('mousedown', (e) => {
     if (e.button === 1) e.preventDefault() // no autoscroll cursor
   })
+  host.addEventListener('contextmenu', (e) => {
+    const id = idOf(e.target)
+    if (id === undefined || !handlers.onMenu) return
+    e.preventDefault()
+    handlers.onMenu(id, e.clientX, e.clientY)
+  })
+  // Tabs move between the strips of a split view by dragging.
+  host.addEventListener('dragstart', (e) => {
+    const id = idOf(e.target)
+    if (id === undefined || !e.dataTransfer) return
+    e.dataTransfer.setData(TAB_MIME, String(id))
+    e.dataTransfer.effectAllowed = 'move'
+  })
+  host.addEventListener('dragover', (e) => {
+    if (!handlers.onDropTab || !e.dataTransfer?.types.includes(TAB_MIME)) return
+    e.preventDefault()
+    host.classList.add('drop-target')
+  })
+  host.addEventListener('dragleave', (e) => {
+    if (!host.contains(e.relatedTarget as Node | null)) host.classList.remove('drop-target')
+  })
+  host.addEventListener('drop', (e) => {
+    host.classList.remove('drop-target')
+    const raw = e.dataTransfer?.getData(TAB_MIME)
+    if (!raw || !handlers.onDropTab) return
+    e.preventDefault()
+    handlers.onDropTab(Number(raw))
+  })
 
   const revealActive = () => host.querySelector('.tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   // The strip shrinks when the window is resized or the Find panel opens: keep the active tab in view.
@@ -74,7 +112,8 @@ export function createTabBar(host: HTMLElement, handlers: TabBarHandlers): { ren
       host.replaceChildren(
         ...items.map((item) => {
           const tab = document.createElement('div')
-          tab.className = item.active ? 'tab active' : item.shown ? 'tab shown' : 'tab'
+          tab.className = item.active ? (item.dim ? 'tab active dim' : 'tab active') : item.shown ? 'tab shown' : 'tab'
+          tab.draggable = handlers.draggable?.() ?? false
           tab.dataset.id = String(item.id)
           tab.setAttribute('role', 'tab')
           tab.setAttribute('aria-selected', String(item.active))
