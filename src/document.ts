@@ -49,9 +49,34 @@ export function blankDocument(name: string): CsvDocument {
   }
 }
 
+/**
+ * What gets written: the columns that have a header or any content, and the rows up to the last one
+ * with content. Empty columns and the empty rows at the end are left out, so a blank document
+ * writes no bytes at all. Empty rows between rows with content stay, to keep the rows in place.
+ */
+export function contentToWrite(table: Table): { headers: string[]; rows: string[][] } {
+  const used = table.headers.map((h) => h !== '')
+  const all = [...table.orderedCells()]
+  let last = -1
+  all.forEach((cells, r) => {
+    cells.forEach((value, c) => {
+      if (value === '') return
+      used[c] = true
+      last = r
+    })
+  })
+  const keep = used.flatMap((u, c) => (u ? [c] : []))
+  return {
+    headers: keep.map((c) => table.headers[c]!),
+    rows: all.slice(0, last + 1).map((cells) => keep.map((c) => cells[c]!)),
+  }
+}
+
 export function serializeDocument(doc: CsvDocument): string {
   const { delimiter, lineEnding, trailingNewline } = doc.format
-  return serializeCsv(doc.table.headers, doc.table.orderedCells(), { delimiter, lineEnding, trailingNewline })
+  const { headers, rows } = contentToWrite(doc.table)
+  if (headers.length === 0) return ''
+  return serializeCsv(headers, rows, { delimiter, lineEnding, trailingNewline })
 }
 
 export interface Encoded {

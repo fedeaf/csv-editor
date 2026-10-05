@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Table } from './model/table'
 import { BLANK_COLUMNS, BLANK_ROWS, blankDocument, encodeDocumentAsync, loadDocument, serializeDocument, untitledName } from './document'
 
 const latin1 = (text: string) => new Uint8Array(Buffer.from(text, 'latin1'))
@@ -52,12 +53,32 @@ describe('blank documents', () => {
     expect(untitledName(['Untitled 2.csv'])).toBe('Untitled.csv')
   })
 
-  it('starts empty, without a file, and saves as plain UTF-8 CSV', () => {
+  it('starts empty, without a file', () => {
     const doc = blankDocument('Untitled.csv')
     expect(doc.handle).toBeUndefined()
     expect(doc.table.headers.length).toBe(BLANK_COLUMNS)
     expect(doc.table.rowCount).toBe(BLANK_ROWS)
-    expect([...doc.table.orderedCells()].every((r) => r.every((v) => v === ''))).toBe(true)
-    expect(serializeDocument(doc).split('\n')[0]).toBe(','.repeat(BLANK_COLUMNS - 1))
+  })
+
+  it('writes nothing for a document that is still blank', () => {
+    expect(serializeDocument(blankDocument('Untitled.csv'))).toBe('')
+  })
+})
+
+describe('what is written', () => {
+  const doc = (headers: string[], rows: string[][]) => ({ ...loadDocument('t.csv', new Uint8Array([0x61, 0x0a])), table: new Table(headers, rows) })
+
+  it('leaves out empty columns and the empty rows at the end', () => {
+    const d = doc(['a', '', 'c', ''], [['1', '', '3', ''], ['', '', '', ''], ['4', '', '', ''], ['', '', '', ''], ['', '', '', '']])
+    expect(serializeDocument(d)).toBe('a,c\n1,3\n,\n4,\n')
+  })
+
+  it('keeps a column without a header when it holds data, and one with a header when it is empty', () => {
+    const d = doc(['a', '', 'c'], [['', 'x', ''], ['', '', '']])
+    expect(serializeDocument(d)).toBe('a,,c\n,x,\n')
+  })
+
+  it('writes only the header row when there are no rows with content', () => {
+    expect(serializeDocument(doc(['a', 'b', ''], [['', '', ''], ['', '', '']]))).toBe('a,b\n')
   })
 })

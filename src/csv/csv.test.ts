@@ -131,8 +131,12 @@ describe('round trip (open, save unedited, reopen)', () => {
     sameTable(doc, again)
   })
   it('keeps blank cells and blank rows aligned', () => {
-    const { doc, again } = roundTrip(utf8('a,b,c\n,,\n1,,3\n\n'))
+    const { doc, again } = roundTrip(utf8('a,b,c\n,,\n1,,3\n,,\n4,,\n'))
     sameTable(doc, again)
+  })
+  it('drops the blank rows at the end, which hold nothing', () => {
+    const { again } = roundTrip(utf8('a,b,c\n1,,3\n,,\n,,\n'))
+    expect(again.table.rowCount).toBe(1)
   })
 })
 
