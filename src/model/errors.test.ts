@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isSpreadsheetError, nextErrorRow, SPREADSHEET_ERRORS } from './errors'
+import { isFlagged, isScientificNotation, isSpreadsheetError, nextErrorRow, SPREADSHEET_ERRORS } from './errors'
 
 describe('isSpreadsheetError', () => {
   it('recognises every error Excel, Google Sheets and LibreOffice write in English', () => {
@@ -82,5 +82,39 @@ describe('nextErrorRow', () => {
   })
   it('still sees an error with spaces or lower case in front of the quick check', () => {
     expect(nextErrorRow((r) => ['x', '  #N/A', 'err:502'][r]!, 3)).toMatchObject({ row: 1, total: 2 })
+  })
+})
+
+describe('isScientificNotation', () => {
+  it('recognises the notation Excel writes for big and small numbers', () => {
+    for (const v of ['1.23457E+15', '1E+15', '-4.5E-07', '+2E+20', '1,5E+10', '9.99999999999999E+22', '123E+5']) {
+      expect(isScientificNotation(v), v).toBe(true)
+    }
+  })
+  it('ignores case and the spaces around it', () => {
+    expect(isScientificNotation('1.5e+10')).toBe(true)
+    expect(isScientificNotation('  1.5E+10\t')).toBe(true)
+  })
+  it('needs the whole cell, and the sign of the exponent', () => {
+    for (const v of ['', ' ', '1e5', '1.5E10', '1.5E+', 'E+10', '1.5E+10 units', 'x1.5E+10', '1.5E+10E+2', '1.5.5E+10', '1.5E+1.2', '12345', '1.5', '1E', 'ABC123E+4', '0x1E+3']) {
+      expect(isScientificNotation(v), JSON.stringify(v)).toBe(false)
+    }
+  })
+  it('stays quick on long text', () => {
+    expect(isScientificNotation('1'.repeat(100_000) + 'E+5')).toBe(false)
+  })
+})
+
+describe('isFlagged', () => {
+  it('takes both spreadsheet errors and scientific notation, and nothing else', () => {
+    expect(isFlagged('#N/A')).toBe(true)
+    expect(isFlagged('1.2E+15')).toBe(true)
+    expect(isFlagged('1.2')).toBe(false)
+    expect(isFlagged('hello')).toBe(false)
+  })
+  it('lets the walk through a column stop at both kinds', () => {
+    const cells = ['a', '3.1E+12', 'b', '#REF!', 'c']
+    expect(nextErrorRow((r) => cells[r]!, cells.length)).toMatchObject({ row: 1, index: 1, total: 2 })
+    expect(nextErrorRow((r) => cells[r]!, cells.length, 1)).toMatchObject({ row: 3, index: 2, total: 2 })
   })
 })

@@ -1,4 +1,4 @@
-import { isSpreadsheetError } from './errors'
+import { isFlagged } from './errors'
 import type { Table } from './table'
 
 /** Value filter and duplicates filter for one column; both must match (FIL-03). */
@@ -63,12 +63,12 @@ export class ColumnStats {
         duplicateRows += n
       }
     }
-    // Errors are found among the distinct values, so this costs nothing on the rows themselves.
+    // Flagged cells (spreadsheet errors, scientific notation) are found among the distinct values, so this costs nothing on the rows themselves.
     let errorCells = 0
     const seen = new Set<string>()
     const errorExamples: string[] = []
     for (const [value, n] of counts) {
-      if (!isSpreadsheetError(value)) continue
+      if (!isFlagged(value)) continue
       errorCells += n
       const key = value.trim().toUpperCase()
       if (!seen.has(key) && errorExamples.length < MAX_ERROR_EXAMPLES) errorExamples.push(value.trim())

@@ -776,7 +776,7 @@ export class Grid {
     let warning: HTMLElement | undefined
     if (info.errorCells > 0) {
       const count = `${info.errorCells.toLocaleString('en-US')} ${info.errorCells === 1 ? 'cell holds' : 'cells hold'}`
-      warning = button('warning', '', `${count} a spreadsheet error: ${info.errorExamples.join(', ')}. Click to go to each one.`)
+      warning = button('warning', '', `${count} a spreadsheet error or a number in scientific notation: ${info.errorExamples.join(', ')}. Click to go to each one.`)
       warning.classList.add('col-warning')
       warning.setAttribute('aria-label', warning.title)
       warning.innerHTML = WARNING

@@ -746,14 +746,14 @@ function goToError(col: number): void {
   const stop = nextErrorRow(cell, v.rowCount, from)
   if (!stop) {
     const hidden = v.stats.get(colId).errorCells
-    showMeta(hidden > 0 ? `${plural(hidden, 'error cell')} in this column ${hidden === 1 ? 'is' : 'are'} in rows hidden by a filter` : 'No spreadsheet errors in this column', true)
+    showMeta(hidden > 0 ? `${plural(hidden, 'flagged cell')} in this column ${hidden === 1 ? 'is' : 'are'} in rows hidden by a filter` : 'No spreadsheet errors or scientific notation in this column', true)
     return
   }
   tab.lastError = { colId, row: stop.row }
   grid.setActive(stop.row, col)
   grid.focus()
   const name = table.headers[col] || `column ${col + 1}`
-  showMeta(`Error ${stop.index} of ${stop.total} in "${name}": ${cell(stop.row).trim()}${stop.wrapped ? ' (back at the first)' : ''}`, true)
+  showMeta(`Warning ${stop.index} of ${stop.total} in "${name}": ${cell(stop.row).trim()}${stop.wrapped ? ' (back at the first)' : ''}`, true)
 }
 
 // --- filters (view only: not part of history, never delete rows) -------------------------
