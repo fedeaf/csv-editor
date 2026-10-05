@@ -14,6 +14,11 @@ describe('tabAfterClose', () => {
   it('falls back to the left neighbour for the last tab', () => {
     expect(tabAfterClose(ids, 30, 30)).toBe(20)
   })
+  it('skips the tab the other pane shows', () => {
+    expect(tabAfterClose(ids, 20, 20, 30)).toBe(10)
+    expect(tabAfterClose(ids, 10, 10, 20)).toBe(30)
+    expect(tabAfterClose([10, 20], 10, 10, 20)).toBeUndefined()
+  })
   it('leaves no tab when the only one is closed', () => {
     expect(tabAfterClose([10], 10, 10)).toBeUndefined()
   })

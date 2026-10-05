@@ -9,11 +9,12 @@ import { TableView, uniqueValues, type ColumnFilter } from './model/view'
 import { closeContextMenu, showContextMenu, type MenuItem } from './ui/contextMenu'
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
 import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
-import { Grid, type FillRequest, type GridModel, type GridState, type Rect } from './ui/grid'
+import { Grid, type FillRequest, type GridHandlers, type GridModel, type GridState, type Rect } from './ui/grid'
 import { confirmDialog, isDialogOpen, messageDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
 import { fileInfo, plural, selectionSummary } from './ui/status'
 import { currentTheme, toggleTheme, watchTheme } from './ui/theme'
+import { createDivider } from './ui/splitDivider'
 import { createTabBar, tabAfterClose } from './ui/tabBar'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -44,7 +45,67 @@ const tabs: Tab[] = []
 let current: Tab | undefined
 let nextTabId = 1
 
-const grid = new Grid($('grid-host'), {
+/**
+ * What the window shows is one or two panes, each with a table of its own (or the start screen).
+ * `focused` is the one being used; `grid` and `current` always belong to it, so shortcuts, menu
+ * actions and Find only ever act on the document in the pane in focus.
+ */
+interface Pane {
+  el: HTMLElement
+  body: HTMLElement
+  warnings: HTMLElement
+  empty: HTMLElement
+  grid: Grid
+  tab: Tab | undefined
+}
+
+type Layout = 'single' | 'side' | 'stacked'
+
+const panes: Pane[] = []
+let layout: Layout = 'single'
+let focused: Pane
+let grid: Grid
+
+/** The first pane's share of the room when the window is split; the bar between the panes changes it. */
+let splitShare = 0.5
+
+function applyShare(): void {
+  panes.forEach((p, i) => (p.el.style.flex = panes.length < 2 ? '' : `${i === 0 ? splitShare : 1 - splitShare} 1 0`))
+}
+
+const divider = createDivider(
+  $('panes'),
+  (share) => {
+    splitShare = share
+    applyShare()
+  },
+  () => splitShare,
+)
+
+function createPane(): Pane {
+  const el = ($('pane-template') as HTMLTemplateElement).content.firstElementChild!.cloneNode(true) as HTMLElement
+  const pane: Pane = {
+    el,
+    body: el.querySelector<HTMLElement>('.pane-body')!,
+    warnings: el.querySelector<HTMLElement>('.pane-warnings')!,
+    empty: el.querySelector<HTMLElement>('.pane-empty')!,
+    grid: undefined!,
+    tab: undefined,
+  }
+  pane.grid = new Grid(pane.body, GRID_HANDLERS)
+  // Whatever is used in a pane (a click, the keyboard) puts that pane in focus first.
+  el.addEventListener('pointerdown', () => focusPane(pane), true)
+  el.addEventListener('focusin', () => focusPane(pane))
+  el.querySelector('.empty-open')!.addEventListener('click', () => {
+    focusPane(pane)
+    Promise.resolve(actions.open!()).catch(report)
+  })
+  panes.push(pane)
+  $('panes').append(el)
+  return pane
+}
+
+const GRID_HANDLERS: GridHandlers = {
   onCellEdit: (row, col, value) => {
     const rowId = current?.view.idAt(row)
     if (current && rowId !== undefined) run(setCell(current.doc.table, rowId, col, value))
@@ -65,7 +126,11 @@ const grid = new Grid($('grid-host'), {
     setStatusMessage(undefined) // the selection took over from the last message
     showActivity()
   },
-})
+}
+
+focused = createPane()
+grid = focused.grid
+focused.el.classList.add('focused')
 
 const tabBar = createTabBar($('tabs'), {
   onSelect: (id) => activate(tabs.find((t) => t.id === id)),
@@ -103,28 +168,81 @@ function modelFor(v: TableView): GridModel {
 
 // --- tabs -------------------------------------------------------------------------------
 
-/** Brings a tab into focus. Whatever was being edited in the old one is applied to it first. */
+/** Puts another pane in focus: from here on, `grid` and `current` are its own. */
+function focusPane(pane: Pane): void {
+  if (pane === focused) return
+  grid.commitEdit()
+  focused.el.classList.remove('focused')
+  focused = pane
+  grid = pane.grid
+  current = pane.tab
+  pane.el.classList.add('focused')
+  search.mount(pane.body)
+  search.setMessage('')
+  showMeta()
+}
+
+/** Shows a tab (or the start screen) in a pane. Whatever was being edited there is applied first. */
+function showIn(pane: Pane, tab: Tab | undefined): void {
+  pane.grid.commitEdit()
+  if (pane.tab) pane.tab.state = pane.grid.saveState()
+  pane.tab = tab
+  if (pane === focused) current = tab
+  pane.grid.setModel(tab && modelFor(tab.view), tab?.state)
+  pane.empty.hidden = !!tab
+  pane.warnings.hidden = !tab?.doc.warnings.length
+  pane.warnings.replaceChildren(
+    ...(tab?.doc.warnings ?? []).map((text) => Object.assign(document.createElement('p'), { textContent: text })),
+  )
+}
+
+/** The tab the other pane shows, if the window is split. */
+function otherTab(): Tab | undefined {
+  return panes.find((p) => p !== focused)?.tab
+}
+
+/** Brings a tab into focus, in the pane in focus; if the other pane already shows it, that pane is the one focused. */
 function activate(tab: Tab | undefined): void {
+  const elsewhere = tab && panes.find((p) => p !== focused && p.tab === tab)
+  if (elsewhere) {
+    focusPane(elsewhere)
+    grid.focus()
+    return
+  }
   if (tab === current) {
     grid.focus()
     return
   }
-  grid.commitEdit()
   closeFilterDropdown()
   closeContextMenu()
-  if (current) current.state = grid.saveState()
-  current = tab
-  grid.setModel(tab && modelFor(tab.view), tab?.state)
-  $('empty').hidden = !!tab
-  const warnings = $('warnings')
-  warnings.hidden = !tab?.doc.warnings.length
-  warnings.replaceChildren(
-    ...(tab?.doc.warnings ?? []).map((text) => Object.assign(document.createElement('p'), { textContent: text })),
-  )
+  showIn(focused, tab)
   search.setMessage('')
   showMeta()
   if (tab) grid.focus()
-  else $('empty-open').focus() // the start screen's button, so Enter opens a file
+  else focused.empty.querySelector<HTMLElement>('.empty-open')!.focus() // the start screen's button, so Enter opens a file
+}
+
+/** One pane, or two side by side or one above the other. The second shows a file not shown yet, or the start screen. */
+function setLayout(next: Layout): void {
+  if (next === layout) return
+  grid.commitEdit()
+  if (next === 'single') {
+    for (const gone of panes.filter((p) => p !== focused)) {
+      panes.splice(panes.indexOf(gone), 1)
+      gone.el.remove()
+    }
+    divider.el.remove()
+  } else if (panes.length === 1) {
+    const spare = tabs.find((t) => t !== current)
+    splitShare = 0.5
+    showIn(createPane(), spare)
+    panes[0]!.el.after(divider.el)
+  }
+  layout = next
+  $('panes').className = next === 'single' ? '' : next
+  divider.setOrientation(next === 'side')
+  applyShare()
+  showMeta()
 }
 
 /** Tabs whose "discard changes?" question is on screen, so a second click on × does not ask twice. */
@@ -132,7 +250,7 @@ const closing = new Set<Tab>()
 
 async function closeTab(tab: Tab | undefined): Promise<void> {
   if (!tab || closing.has(tab)) return
-  if (tab === current) grid.commitEdit() // an unfinished edit counts as a change
+  panes.find((p) => p.tab === tab)?.grid.commitEdit() // an unfinished edit counts as a change
   if (tab.history.dirty) {
     closing.add(tab)
     const discard = await confirmDialog({
@@ -147,8 +265,11 @@ async function closeTab(tab: Tab | undefined): Promise<void> {
       return
     }
   }
-  const next = tabAfterClose(tabs.map((t) => t.id), tab.id, current?.id)
+  const next = tabAfterClose(tabs.map((t) => t.id), tab.id, current?.id, otherTab()?.id)
   tabs.splice(tabs.indexOf(tab), 1)
+  // In the other pane, a closed file gives way to one not shown yet, or to the start screen.
+  const holder = panes.find((p) => p !== focused && p.tab === tab)
+  if (holder) showIn(holder, tabs.find((t) => t !== current))
   // Closing the tab in focus switches to its neighbour (or to the empty state); another tab just goes away.
   if (tab === current) activate(tabs.find((t) => t.id === next))
   else showMeta()
@@ -215,7 +336,7 @@ function showActivity(): void {
  * result of an action ("Saved", "Pasted"); without one, any earlier message is cleared.
  */
 function showMeta(message?: string, neutral = false): void {
-  tabBar.render(tabs.map((t) => ({ id: t.id, label: t.doc.name, dirty: t.history.dirty, active: t === current })))
+  tabBar.render(tabs.map((t) => ({ id: t.id, label: t.doc.name, dirty: t.history.dirty, active: t === current, shown: t === otherTab() })))
   const tab = current
   // The browser tab keeps the name of the app whatever is open. Its asterisk (ARC-05) says that some
   // document has unsaved changes; which one is shown by the asterisk in the strip of tabs.
@@ -227,6 +348,9 @@ function showMeta(message?: string, neutral = false): void {
   item('save-as').classList.toggle('disabled', !tab)
   item('find').classList.toggle('disabled', !tab)
   item('clear-filters').classList.toggle('disabled', !tab?.view.filtered)
+  item('split-side').classList.toggle('disabled', layout === 'side')
+  item('split-stacked').classList.toggle('disabled', layout === 'stacked')
+  item('single-view').classList.toggle('disabled', layout === 'single')
   setStatusMessage(message, neutral)
   showActivity()
   $('status-info').textContent = tab
@@ -427,6 +551,7 @@ const search = createSearchPanel({
   onReplaceAll: replaceAll,
   onClose: () => grid.focus(),
 })
+search.mount(focused.body)
 
 /** The cells a search looks at: the rows shown in a tab. */
 function searchGrid(tab: Tab): SearchGrid {
@@ -666,6 +791,9 @@ const actions: Record<string, () => void | Promise<void>> = {
   'save-as': () => save(true),
   undo,
   redo,
+  'split-side': () => setLayout('side'),
+  'split-stacked': () => setLayout('stacked'),
+  'single-view': () => setLayout('single'),
   'clear-filters': clearFilters,
   find: () => search.open(),
   'dark-mode': () => {
@@ -689,9 +817,6 @@ function setMenu(isOpen: boolean): void {
 menuButton.addEventListener('click', () => setMenu(menuList.hidden !== false))
 document.addEventListener('click', (e) => {
   if (!(e.target as Element).closest('.menu')) setMenu(false)
-})
-$('empty-open').addEventListener('click', () => {
-  Promise.resolve(actions.open!()).catch(report)
 })
 menuList.addEventListener('click', (e) => {
   const item = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')
@@ -819,6 +944,12 @@ window.addEventListener('drop', (e) => {
   if (!hasFiles(e.dataTransfer)) return
   e.preventDefault()
   endDrag()
+  // In a split view, the file goes to the pane it was dropped on.
+  const target = panes.find((p) => {
+    const r = p.el.getBoundingClientRect()
+    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+  })
+  if (target) focusPane(target)
   readDropped(e.dataTransfer!)
     .then(async ({ docs, errors }) => {
       await openDocuments(docs)
@@ -834,7 +965,7 @@ window.addEventListener('beforeunload', (e) => {
 })
 
 showMeta()
-$('empty-open').focus({ preventScroll: true })
+focused.empty.querySelector<HTMLElement>('.empty-open')!.focus({ preventScroll: true })
 
 // Test hook for headless runs, where native file pickers cannot be driven.
 if (import.meta.env.DEV) {
@@ -842,7 +973,11 @@ if (import.meta.env.DEV) {
   Object.assign(window, {
     __app: {
       load: (name: string, bytes: Uint8Array) => openDocuments([loadDocument(name, bytes)]),
-      grid,
+      get grid() {
+        return grid
+      },
+      setLayout,
+      panes: () => panes.map((p) => ({ tab: p.tab?.doc.name, focused: p === focused })),
       getDoc: () => current?.doc,
       getHistory: () => current?.history,
       getView: () => current?.view,

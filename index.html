@@ -20,6 +20,10 @@
           <li role="menuitem" data-action="save">Save<kbd>Ctrl+S</kbd></li>
           <li role="menuitem" data-action="save-as">Save As…</li>
           <li role="separator" class="separator"></li>
+          <li role="menuitem" data-action="split-side">Split Side by Side</li>
+          <li role="menuitem" data-action="split-stacked">Split Top and Bottom</li>
+          <li role="menuitem" data-action="single-view">Single View</li>
+          <li role="separator" class="separator"></li>
           <li role="menuitem" data-action="undo">Undo<kbd>Ctrl+Z</kbd></li>
           <li role="menuitem" data-action="redo">Redo<kbd>Ctrl+Y</kbd></li>
           <li role="separator" class="separator"></li>
@@ -31,21 +35,26 @@
       </div>
       <div id="tabs"></div>
     </header>
-    <div id="warnings" hidden></div>
-    <main id="grid-host">
-      <div id="empty">
-        <div class="empty-card">
-          <svg class="empty-icon" viewBox="0 0 48 48" width="56" height="56" aria-hidden="true">
-            <rect x="6" y="9" width="36" height="30" rx="3" fill="none" stroke="currentColor" stroke-width="2.5" />
-            <path d="M6 18h36M6 28h36M19 9v30M31 9v30" fill="none" stroke="currentColor" stroke-width="2.5" />
-          </svg>
-          <h1>Open a CSV file</h1>
-          <p>Drop one or more <b>.csv</b> files anywhere in this window, or choose them yourself.</p>
-          <button id="empty-open" class="primary-button">Open file…</button>
-          <p class="empty-hint">The encoding and the delimiter are detected for you. Your files stay on this computer.</p>
+    <main id="panes"></main>
+    <template id="pane-template">
+      <section class="pane">
+        <div class="pane-warnings" hidden></div>
+        <div class="pane-body">
+          <div class="pane-empty">
+            <div class="empty-card">
+              <svg class="empty-icon" viewBox="0 0 48 48" width="56" height="56" aria-hidden="true">
+                <rect x="6" y="9" width="36" height="30" rx="3" fill="none" stroke="currentColor" stroke-width="2.5" />
+                <path d="M6 18h36M6 28h36M19 9v30M31 9v30" fill="none" stroke="currentColor" stroke-width="2.5" />
+              </svg>
+              <h1>Open a CSV file</h1>
+              <p>Drop one or more <b>.csv</b> files anywhere in this window, or choose them yourself.</p>
+              <button class="primary-button empty-open">Open file…</button>
+              <p class="empty-hint">The encoding and the delimiter are detected for you. Your files stay on this computer.</p>
+            </div>
+          </div>
         </div>
-      </div>
-    </main>
+      </section>
+    </template>
     <div id="drop-overlay" hidden><div>Drop a CSV file to open it</div></div>
     <footer id="status"><span id="status-activity"></span><span id="status-info"></span></footer>
     <script type="module" src="/src/main.ts"></script>

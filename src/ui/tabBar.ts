@@ -3,6 +3,8 @@ export interface TabItem {
   label: string
   dirty: boolean
   active: boolean
+  /** Shown in the other pane of a split view. */
+  shown?: boolean
 }
 
 export interface TabBarHandlers {
@@ -13,11 +15,13 @@ export interface TabBarHandlers {
   onNew(): void
 }
 
-/** Which tab to show after `closingId` is closed: the right neighbour, else the left, else none. */
-export function tabAfterClose(ids: number[], closingId: number, activeId: number | undefined): number | undefined {
+/** Which tab to show after `closingId` is closed: the right neighbour, else the left, else none. A tab `shownElsewhere` (in the other pane) is skipped. */
+export function tabAfterClose(ids: number[], closingId: number, activeId: number | undefined, shownElsewhere?: number): number | undefined {
   if (closingId !== activeId) return activeId
   const at = ids.indexOf(closingId)
-  return ids[at + 1] ?? ids[at - 1]
+  // Nearest on the right first, then on the left; never the one the other pane already shows.
+  const candidates = [...ids.slice(at + 1), ...ids.slice(0, at).reverse()]
+  return candidates.find((id) => id !== shownElsewhere)
 }
 
 /** The strip of document tabs that replaces the plain file name in the toolbar. */
@@ -70,7 +74,7 @@ export function createTabBar(host: HTMLElement, handlers: TabBarHandlers): { ren
       host.replaceChildren(
         ...items.map((item) => {
           const tab = document.createElement('div')
-          tab.className = item.active ? 'tab active' : 'tab'
+          tab.className = item.active ? 'tab active' : item.shown ? 'tab shown' : 'tab'
           tab.dataset.id = String(item.id)
           tab.setAttribute('role', 'tab')
           tab.setAttribute('aria-selected', String(item.active))

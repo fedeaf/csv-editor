@@ -79,12 +79,26 @@ body { display: flex; flex-direction: column; background: var(--surface); }
 #menu-list { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 200px; }
 #menu-list[hidden] { display: none; }
 
-#warnings { padding: 6px 10px; background: var(--notice-bg); border-bottom: 1px solid var(--notice-line); }
-#warnings p { margin: 0; }
-
-#grid-host { position: relative; flex: 1; min-height: 0; }
-#empty { position: absolute; inset: 0; z-index: 1; /* above the empty grid, which comes later in the page */ display: grid; place-items: center; padding: 24px; overflow: auto; }
-#empty[hidden] { display: none; }
+#panes { display: flex; flex: 1; min-height: 0; }
+#panes.stacked { flex-direction: column; }
+.pane { position: relative; display: flex; flex: 1 1 0; flex-direction: column; min-width: 0; min-height: 0; }
+.pane-warnings { padding: 6px 10px; background: var(--notice-bg); border-bottom: 1px solid var(--notice-line); }
+.pane-warnings[hidden] { display: none; }
+.pane-warnings p { margin: 0; }
+.pane-body { position: relative; flex: 1; min-height: 0; }
+.pane-empty { position: absolute; inset: 0; z-index: 1; /* above the empty grid, which comes later in the page */ display: grid; place-items: center; padding: 24px; overflow: auto; }
+.pane-empty[hidden] { display: none; }
+/* Two files at once: a line between the panes, and a line in the accent colour over the one in focus. */
+.pane-divider { flex: none; background: var(--line); }
+.pane-divider:hover, .pane-divider.dragging, .pane-divider:focus-visible { background: var(--accent); outline: none; }
+#panes.side .pane-divider { width: 5px; cursor: col-resize; }
+#panes.stacked .pane-divider { height: 5px; cursor: row-resize; }
+body.resizing-rows, body.resizing-rows * { cursor: row-resize !important; user-select: none; }
+#panes.side .pane::before, #panes.stacked .pane::before { content: ''; position: absolute; z-index: 40; top: 0; left: 0; right: 0; height: 2px; background: transparent; pointer-events: none; }
+/* The selection in the pane that is not in focus is drawn in grey. */
+#panes.side .pane:not(.focused), #panes.stacked .pane:not(.focused) { --selection-edge: var(--ink-subtle); }
+#panes.side .pane:not(.focused) .fill-handle, #panes.stacked .pane:not(.focused) .fill-handle { background: var(--ink-subtle); }
+#panes.side .pane.focused::before, #panes.stacked .pane.focused::before { background: var(--accent); }
 
 .grid-scroller { position: absolute; inset: 0; overflow: auto; }
 .grid-header { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: var(--grid-cols); background: var(--chrome); border-bottom: 1px solid var(--line); }
@@ -226,6 +240,7 @@ body.filling, body.filling * { cursor: crosshair !important; user-select: none; 
 .tab { display: flex; flex: none; align-items: center; gap: 4px; max-width: 220px; height: 30px; padding: 0 4px 0 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 5px 5px 0 0; color: var(--ink-muted); cursor: pointer; user-select: none; }
 .tab:hover { background: var(--chrome-hover-soft); }
 .tab.active { background: var(--surface); border-color: var(--line); color: var(--ink); font-weight: 600; margin-bottom: -1px; height: 31px; }
+.tab.shown:not(.active) { color: var(--ink); box-shadow: inset 0 -2px 0 var(--line); }
 .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab-close { flex: none; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--ink-subtle); font-size: 15px; line-height: 1; cursor: pointer; }
 .tab-new { position: sticky; right: 0; flex: none; align-self: center; display: grid; place-items: center; width: 26px; height: 26px; margin: 0 0 3px 2px; padding: 0; border: 0; border-radius: 5px; background: var(--chrome); color: var(--ink-muted); font-size: 18px; line-height: 1; cursor: pointer; }

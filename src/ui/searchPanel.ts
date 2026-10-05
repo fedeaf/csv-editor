@@ -11,6 +11,8 @@ export interface SearchPanelHandlers {
 export interface SearchPanel {
   open(): void
   close(): void
+  /** Puts the panel in the area of a table; it follows the pane in focus. */
+  mount(host: HTMLElement): void
   readonly isOpen: boolean
   readonly query: string
   readonly exact: boolean
@@ -41,8 +43,6 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
       <button class="sp-replace-one" title="Replace this match and go to the next">Replace</button>
       <button class="sp-replace-all" title="Replace every match in the rows shown">Replace all</button>
     </div>`
-  // In the area of the table, so that it sits under the column headers and follows the table around.
-  document.getElementById('grid-host')!.append(root)
   const $ = <T extends HTMLElement>(selector: string) => root.querySelector<T>(selector)!
   const input = $<HTMLInputElement>('.sp-input')
   const exact = $<HTMLInputElement>('.sp-exact input')
@@ -55,6 +55,10 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
   syncReplaceButtons()
 
   const panel: SearchPanel = {
+    // In the area of the table, so that it sits under the column headers and follows the table around.
+    mount(host) {
+      host.append(root)
+    },
     open() {
       root.hidden = false
       input.focus()
