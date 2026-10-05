@@ -31,6 +31,8 @@
   --accent-wash: light-dark(#e8f0fe, #2f3a4d); /* hover on menu items and list entries */
   --accent-soft: light-dark(#d2e3fc, #3a4d6e); /* an active header button */
   --accent-tint: light-dark(#e3edfb, #2d3a52); /* a filtered header */
+  --match: light-dark(#fff3bf, #4d4313); /* a cell that Find has matched */
+  --match-current: light-dark(#ffd666, #7a6618); /* the one Find has selected */
   --accent-overlay: light-dark(rgb(26 115 232 / 12%), rgb(138 180 248 / 16%));
   --accent-overlay-weak: light-dark(rgb(26 115 232 / 8%), rgb(138 180 248 / 10%));
 
@@ -149,6 +151,7 @@ body.resizing-rows, body.resizing-rows * { cursor: row-resize !important; user-s
  * corner or a single row gets exactly the edges it needs.
  */
 .grid-scroller { outline: none; user-select: none; }
+.cell.match { background: var(--match); }
 .cell.selected {
   background: var(--selection-fill);
   box-shadow: var(--sel-t, 0 0 #0000), var(--sel-b, 0 0 #0000), var(--sel-l, 0 0 #0000), var(--sel-r, 0 0 #0000);
@@ -158,7 +161,8 @@ body.resizing-rows, body.resizing-rows * { cursor: row-resize !important; user-s
 .cell.sel-l { --sel-l: inset 2px 0 0 var(--selection-edge); }
 .cell.sel-r { --sel-r: inset -2px 0 0 var(--selection-edge); }
 .cell.active { outline: 2px solid var(--selection-edge); outline-offset: -2px; background: var(--surface); position: relative; z-index: 1; }
-.cell.selected.active { background: var(--selection-fill); } /* the active cell of a block is filled like the rest; its outline marks it */
+.cell.selected.active { background: var(--selection-fill); }
+.cell.match.active:not(.selected) { background: var(--match-current); } /* the active cell of a block is filled like the rest; its outline marks it */
 .row-number.active, .header-cell.active { background: var(--selection-header); color: var(--ink); }
 .header-cell.band { background: var(--selection-header-strong); }
 /* 2px border + 6px padding = the 8px a cell has: the text does not shift when editing starts, and a text that just fits the cell does not wrap. */

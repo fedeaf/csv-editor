@@ -24,6 +24,8 @@ export interface GridModel {
   column(col: number): ColumnInfo
   /** Width in pixels of a column, as the user left it. */
   columnWidth(col: number): number
+  /** Whether the cell is one a search found, to be drawn marked. */
+  isMatch?(row: number, col: number): boolean
 }
 
 export interface ColumnInfo {
@@ -965,6 +967,11 @@ export class Grid {
     return index >= from && index <= to
   }
 
+  /** Draws the cells again with their marks (search matches) as they stand now, leaving the rest alone. */
+  repaintMarks(): void {
+    for (const [index, node] of this.rendered) this.paintRow(node, index)
+  }
+
   private paintRow(node: HTMLElement, index: number): void {
     const { r0, c0, r1, c1 } = this.selection()
     const inRows = index >= r0 && index <= r1
@@ -980,6 +987,7 @@ export class Grid {
       const classes = cells[c]!.classList
       classes.toggle('active', index === this.active.row && col === this.active.col)
       classes.toggle('selected', inBlock)
+      classes.toggle('match', this.model?.isMatch?.(index, col) ?? false)
       // The outline of the block goes on the cells along its edges.
       classes.toggle('sel-t', inBlock && index === r0)
       classes.toggle('sel-b', inBlock && index === r1)

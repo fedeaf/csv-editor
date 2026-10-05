@@ -219,6 +219,11 @@ function modelFor(v: TableView): GridModel {
     cells: (row) => table.rowById(v.visible[row]!)!.cells,
     rowNumber: (row) => v.rowNumber(row),
     columnWidth: (col) => v.widths.get(table.colIds[col]!) ?? DEFAULT_COLUMN_WIDTH,
+    isMatch: (row, col) => {
+      const tab = tabs.find((t) => t.view === v)
+      const list = tab && highlightFor(tab)
+      return !!list && matchNumber(list, { row, col }, table.columnCount) > 0
+    },
     column: (col) => {
       const colId = table.colIds[col]!
       const stat = v.stats.get(colId)
@@ -247,6 +252,7 @@ function focusPane(pane: Pane): void {
   pane.el.classList.add('focused')
   search.mount(pane.body)
   search.setMessage('')
+  repaintMarks()
   showMeta()
 }
 
@@ -725,11 +731,18 @@ document.addEventListener('paste', pasteClipboard)
 // --- search (BUS-01 to BUS-07) -------------------------------------------------------------
 
 const search = createSearchPanel({
-  onSearch: () => void find('first'),
+  onSearch: () => {
+    void find('first')
+    repaintMarks()
+  },
+  onOpen: () => repaintMarks(),
   onStep: (direction) => void find(direction === 1 ? 'next' : 'previous'),
   onReplace: replaceCurrent,
   onReplaceAll: replaceAll,
-  onClose: () => grid.focus(),
+  onClose: () => {
+    repaintMarks()
+    grid.focus()
+  },
 })
 search.mount(focused.body)
 
@@ -747,6 +760,23 @@ function matchesOf(tab: Tab, query: string, mode: { exact: boolean; regex: boole
   const list = findAllMatches(searchGrid(tab), query, mode)
   tab.matches = { query, ...mode, version: tab.version, list }
   return list
+}
+
+/** The matches to draw marked in a tab: those of the open Find panel, only for the document in focus. */
+let highlight: { tab: Tab; key: string; list: number[] | undefined } | undefined
+
+function highlightFor(tab: Tab): number[] | undefined {
+  if (tab !== current || !search.isOpen || search.query === '') return undefined
+  const key = `${search.query}\0${search.exact}\0${search.regex}\0${tab.version}`
+  if (highlight?.tab === tab && highlight.key === key) return highlight.list
+  const list = patternError(search.query, search.regex) === undefined ? matchesOf(tab, search.query, searchMode()) : undefined
+  highlight = { tab, key, list }
+  return list
+}
+
+/** Marks again, in every pane, the cells that Find has matched. */
+function repaintMarks(): void {
+  for (const pane of panes) pane.grid.repaintMarks()
 }
 
 /** How the Find panel asks to read the text to find. */

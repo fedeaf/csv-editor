@@ -6,6 +6,8 @@ export interface SearchPanelHandlers {
   onReplace(): void
   onReplaceAll(): void
   onClose(): void
+  /** The panel was opened. */
+  onOpen?(): void
 }
 
 export interface SearchPanel {
@@ -114,6 +116,7 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
       keepInside()
       input.focus()
       input.select()
+      handlers.onOpen?.()
     },
     close() {
       if (root.hidden) return

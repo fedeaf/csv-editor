@@ -66,6 +66,8 @@ const pairs: [string, string, number][] = [
   ['ink', 'accent-tint', 4.5],
   ['warn-ink', 'warn-bg', 4.5], // the DUP indicator
   ['ink', 'notice-bg', 4.5],
+  ['ink', 'match', 4.5], // a cell that Find matched
+  ['ink', 'match-current', 4.5],
   ['danger', 'surface', 4.5], // "No matches"
   ['danger', 'chrome', 4.5],
   ['accent', 'selection-fill', 3], // the outline of a selected block against its fill
