@@ -33,19 +33,33 @@ export function fileInfo({ rows, rowsShown, columns, format }: FileInfo): string
 
 const n = (count: number) => count.toLocaleString('en-US')
 
+/** How a piece of the summary is drawn: `ok` for good news, `warn` for something to look at, `plain` for a figure. */
+export type Tone = 'ok' | 'warn' | 'plain'
+
+export interface SummaryChip {
+  text: string
+  tone: Tone
+}
+
 /**
- * What the selected cells hold, for the status bar: "2 blank · 1 null · 9 unique · 3 duplicate values (12 cells)".
- * `detail` is the longer explanation for the tooltip.
+ * What the selected cells hold, for the status bar, in pieces: "2 blank", "1 null", "9 unique",
+ * "3 duplicate values (12 cells)", or "No blanks" and "No duplicates". `text` is the same joined
+ * with " · ", and `detail` the longer explanation for the tooltip.
  */
-export function summaryText(s: Summary): { text: string; detail: string } {
-  const parts: string[] = []
-  if (s.blank === 0 && s.nullLike === 0) parts.push('No blanks')
-  if (s.blank > 0) parts.push(`${n(s.blank)} blank`)
-  if (s.nullLike > 0) parts.push(`${n(s.nullLike)} null`)
-  if (s.duplicatesSkipped) parts.push('Unique and duplicates not counted')
-  else {
-    parts.push(`${n(s.uniqueValues)} unique`)
-    parts.push(s.duplicateValues === 0 ? 'No duplicates' : `${plural(s.duplicateValues, 'duplicate value')} (${plural(s.duplicateCells, 'cell')})`)
+export function summaryText(s: Summary): { chips: SummaryChip[]; text: string; detail: string } {
+  const chips: SummaryChip[] = []
+  if (s.blank === 0 && s.nullLike === 0) chips.push({ text: 'No blanks', tone: 'ok' })
+  if (s.blank > 0) chips.push({ text: `${n(s.blank)} blank`, tone: 'warn' })
+  if (s.nullLike > 0) chips.push({ text: `${n(s.nullLike)} null`, tone: 'warn' })
+  if (s.duplicatesSkipped) {
+    chips.push({ text: 'Unique and duplicates not counted', tone: 'plain' })
+  } else {
+    chips.push({ text: `${n(s.uniqueValues)} unique`, tone: 'plain' })
+    chips.push(
+      s.duplicateValues === 0
+        ? { text: 'No duplicates', tone: 'ok' }
+        : { text: `${plural(s.duplicateValues, 'duplicate value')} (${plural(s.duplicateCells, 'cell')})`, tone: 'warn' },
+    )
   }
   const detail = [
     `${n(s.cells)} cells selected`,
@@ -55,5 +69,5 @@ export function summaryText(s: Summary): { text: string; detail: string } {
       ? 'Unique values and duplicates: not counted, there are too many different values'
       : `Unique: ${plural(s.uniqueValues, 'different value')} (blanks left out)\nDuplicates: ${plural(s.duplicateValues, 'value')} repeat, in ${plural(s.duplicateCells, 'cell')} (exact matches among the cells selected; blanks never count)`,
   ].join('\n')
-  return { text: parts.join(' · '), detail }
+  return { chips, text: chips.map((c) => c.text).join(' · '), detail }
 }

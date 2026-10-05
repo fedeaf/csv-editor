@@ -48,6 +48,8 @@
   --notice-bg: light-dark(#fff4ce, #3f3818); /* the banner for rows that were padded or widened */
   --notice-line: light-dark(#e6d28a, #6e6025);
   --ok: light-dark(#34a853, #81c995); /* no duplicates */
+  --ok-bg: light-dark(#e1f3e5, #1f3a29); /* "No blanks" and "No duplicates" in the status bar */
+  --ok-ink: light-dark(#176b2c, #81c995);
   --danger: light-dark(#c5221f, #f28b82); /* no matches, and a button that discards */
   --danger-strong: light-dark(#a50e0e, #f6aea9);
   --scrim: light-dark(rgb(32 33 36 / 45%), rgb(0 0 0 / 60%)); /* the dim layer behind a dialog */
@@ -116,7 +118,11 @@ body.resizing-rows, body.resizing-rows * { cursor: row-resize !important; user-s
 
 /* Status bar: what is going on on the left (the selection, or the result of the last action), the file on the right */
 #status { display: flex; align-items: baseline; gap: 16px; padding: 3px 10px; color: var(--ink-muted); background: var(--chrome); border-top: 1px solid var(--line); min-height: 24px; }
-#status-activity { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status-activity { display: flex; align-items: baseline; gap: 8px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.st-selection { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.st-chip { flex: none; padding: 0 8px; border-radius: 9px; font-size: 12px; line-height: 17px; background: var(--chrome-hover-soft); color: var(--ink-muted); }
+.st-chip.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.st-chip.ok { background: var(--ok-bg); color: var(--ok-ink); }
 #status-activity.message { color: var(--ink); font-weight: 600; }
 #status-activity.message:not(.neutral)::before { content: '✓ '; color: var(--ok); }
 #status-info { flex: none; margin-left: auto; white-space: nowrap; }

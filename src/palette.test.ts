@@ -68,6 +68,8 @@ const pairs: [string, string, number][] = [
   ['danger', 'surface', 4.5], // "No matches"
   ['danger', 'chrome', 4.5],
   ['accent', 'selection-fill', 3], // the outline of a selected block against its fill
+  ['ok-ink', 'ok-bg', 4.5], // "No blanks", "No duplicates" in the status bar
+  ['ink-muted', 'chrome-hover-soft', 4.5], // the figures of the summary
   ['ok', 'chrome', 2.5], // the check mark of a column without duplicates: decoration
 ]
 

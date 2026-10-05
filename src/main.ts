@@ -15,7 +15,7 @@ import { Grid, type FillRequest, type GridHandlers, type GridModel, type GridSta
 import { confirmDialog, formatDialog, isDialogOpen, messageDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
 import { createAccumulator, type Summary } from './model/summary'
-import { fileInfo, plural, selectionSummary, summaryText } from './ui/status'
+import { fileInfo, plural, selectionSummary, summaryText, type SummaryChip } from './ui/status'
 import { currentTheme, toggleTheme, watchTheme } from './ui/theme'
 import { createDivider } from './ui/splitDivider'
 import { createTabBar, tabAfterClose } from './ui/tabBar'
@@ -375,6 +375,7 @@ function showActivity(): void {
   const activity = $('status-activity')
   let text = statusMessage?.text ?? ''
   let detail = ''
+  let chips: SummaryChip[] = []
   if (!statusMessage && current) {
     const rect = grid.selection()
     text = selectionSummary(rect, current.view.rowCount)
@@ -386,12 +387,14 @@ function showActivity(): void {
       }
       if (selectionStats?.key === key) {
         const stats = summaryText(selectionStats.summary)
-        text += ` · ${stats.text}`
+        chips = stats.chips
         detail = stats.detail
       }
     }
   }
-  activity.textContent = text
+  // The selection in plain text, then each figure about it as a small coloured label.
+  const label = Object.assign(document.createElement('span'), { className: 'st-selection', textContent: text })
+  activity.replaceChildren(label, ...chips.map((c) => Object.assign(document.createElement('span'), { className: `st-chip ${c.tone}`, textContent: c.text })))
   activity.title = detail
   activity.classList.toggle('message', !!statusMessage)
   activity.classList.toggle('neutral', !!statusMessage?.neutral)
