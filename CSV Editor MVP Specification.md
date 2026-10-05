@@ -288,6 +288,8 @@ The palette is defined once, as named values at the top of the stylesheet, and e
 
 Each colour is written once with its two values, light and dark (`light-dark()`), and a dark theme is built from the same names. The accent turns lighter and the text on it dark; every pair of text and background keeps at least the contrast WCAG asks for (4.5:1), which a test checks for both themes. The page opens with the system's theme. **Menu > Dark Mode** is a switch that changes it for as long as the page stays open; the choice is deliberately not stored, so the next visit starts from the system again.
 
+Reading aid: while a single cell is selected, the rest of its row and of its column carry a faint tint of the accent colour (`--crosshair`, a translucent layer over whatever background the cells have, striped rows included); it disappears when a block, a row or a column is selected, where the selection style below takes over.
+
 Selection style: the cells of a block are tinted and the block is outlined along its outer edge. The active cell, where typing goes, is tinted like the rest and told apart by its own outline. The row numbers and headers the block covers are shaded, and a whole selected column has a darker header.
 
 The Find panel floats at the top right of the table, starting just under the row of column headers, so the headers stay in view and only the first rows are covered.

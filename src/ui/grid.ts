@@ -954,12 +954,16 @@ export class Grid {
     const inRows = index >= r0 && index <= r1
     const block = r1 > r0 || c1 > c0 // a single cell is shown by its outline alone
     node.firstElementChild!.classList.toggle('active', inRows)
+    // With a single cell selected, its row and column are tinted faintly, to find it again at a glance.
+    const single = !this.band && !block
+    node.classList.toggle('here', single && index === this.active.row)
     const cells = node.children
     for (let c = 1; c < cells.length; c++) {
       const col = c - 1
       const inBlock = block && inRows && col >= c0 && col <= c1
       const classes = cells[c]!.classList
       classes.toggle('active', index === this.active.row && col === this.active.col)
+      classes.toggle('here-col', single && col === this.active.col)
       classes.toggle('selected', inBlock)
       // The outline of the block goes on the cells along its edges.
       classes.toggle('sel-t', inBlock && index === r0)
