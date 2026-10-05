@@ -202,6 +202,9 @@ export class Grid {
     this.header.replaceChildren()
     this.widths = model ? model.headers.map((_, c) => clampWidth(model.columnWidth(c))) : []
     this.layoutColumns()
+    // With no document there is nothing to scroll, and no header to show over the start screen.
+    this.header.style.display = model ? '' : 'none'
+    if (!model) this.header.style.width = this.body.style.width = this.body.style.height = '0px'
     if (model) {
       const columns = model.headers.length
       this.header.style.height = `${HEADER_HEIGHT}px`
