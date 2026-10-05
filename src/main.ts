@@ -18,7 +18,7 @@ import { createAccumulator, type Summary } from './model/summary'
 import { fileInfo, plural, selectionSummary, summaryText, type SummaryChip } from './ui/status'
 import { currentTheme, toggleTheme, watchTheme } from './ui/theme'
 import { createDivider } from './ui/splitDivider'
-import { createTabBar, tabAfterClose } from './ui/tabBar'
+import { createTabBar, placeTab, tabAfterClose } from './ui/tabBar'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -158,11 +158,11 @@ const strips = ([0, 1] as const).map((side) =>
       const tab = tabs.find((t) => t.id === id)
       if (tab) showContextMenu(x, y, tabItems(tab))
     },
-    onDropTab: (id) => {
+    onDropTab: (id, before) => {
       const tab = tabs.find((t) => t.id === id)
-      if (tab) moveTab(tab, side)
+      if (tab) moveTab(tab, side, before)
     },
-    draggable: () => layout === 'side',
+    draggable: () => true,
   }),
 )
 
@@ -178,15 +178,19 @@ function tabItems(tab: Tab): MenuItem[] {
 }
 
 /**
- * Side by side: moves a tab to the strip of the other pane and shows it there. The pane it leaves shows
- * its neighbour in the strip, or the start screen if there is none.
+ * Puts a tab before `before` (or at the end) in the strip it is dropped on. Side by side, a tab dropped on the
+ * other strip also goes to that pane and is shown there; the pane it leaves shows its neighbour in the
+ * strip, or the start screen if there is none.
  */
-function moveTab(tab: Tab, side: 0 | 1): void {
-  if (layout !== 'side' || tab.side === side) return
+function moveTab(tab: Tab, side: 0 | 1, before?: number): void {
+  const crossing = layout === 'side' && tab.side !== side
   const from = panes[tab.side]
   const group = tabs.filter((t) => t.side === tab.side)
   const nextId = tabAfterClose(group.map((t) => t.id), tab.id, tab.id)
-  tab.side = side
+  if (crossing) tab.side = side
+  const order = placeTab(tabs.map((t) => t.id), tab.id, before, (id) => layout !== 'side' || tabs.find((t) => t.id === id)!.side === tab.side)
+  tabs.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+  if (!crossing) return showMeta()
   if (from?.tab === tab) {
     showIn(from, tabs.find((t) => t.id === nextId && t !== tab))
     if (from === focused) current = from.tab

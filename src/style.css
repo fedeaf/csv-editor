@@ -259,6 +259,9 @@ body.moving-panel, body.moving-panel * { cursor: grabbing !important; user-selec
 .tab:hover { background: var(--chrome-hover-soft); }
 .tab.active { background: var(--surface); border-color: var(--line); color: var(--ink); font-weight: 600; margin-bottom: -1px; height: 31px; box-shadow: inset 0 2px 0 var(--accent); }
 .tab-dirty { flex: none; width: 8px; height: 8px; margin-right: 1px; border-radius: 50%; background: var(--warn-ink); }
+.tab.dragging { opacity: 0.5; }
+.tab.drop-before { box-shadow: inset 3px 0 0 var(--accent); }
+.tab.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
 .tab.active.dim { box-shadow: inset 0 2px 0 var(--line); }
 .tab.shown:not(.active) { color: var(--ink); box-shadow: inset 0 -2px 0 var(--line); }
 .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
