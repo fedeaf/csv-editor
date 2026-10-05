@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { encodeDocumentAsync, loadDocument } from './document'
+import { BLANK_COLUMNS, BLANK_ROWS, blankDocument, encodeDocumentAsync, loadDocument, serializeDocument, untitledName } from './document'
 
 const latin1 = (text: string) => new Uint8Array(Buffer.from(text, 'latin1'))
 const windows1252 = () => loadDocument('t.csv', latin1('a,b\n1,\xe9\n')) // "1,é" in Windows-1252
@@ -41,5 +41,23 @@ describe('encodeDocumentAsync', () => {
     const doc = windows1252()
     Object.defineProperty(doc, 'table', { get: () => { throw new Error('broken') } })
     await expect(encodeDocumentAsync(doc, async () => true)).rejects.toThrow('broken')
+  })
+})
+
+describe('blank documents', () => {
+  it('names new documents after the first free "Untitled"', () => {
+    expect(untitledName([])).toBe('Untitled.csv')
+    expect(untitledName(['Untitled.csv', 'a.csv'])).toBe('Untitled 2.csv')
+    expect(untitledName(['untitled.csv', 'Untitled 2.csv'])).toBe('Untitled 3.csv')
+    expect(untitledName(['Untitled 2.csv'])).toBe('Untitled.csv')
+  })
+
+  it('starts empty, without a file, and saves as plain UTF-8 CSV', () => {
+    const doc = blankDocument('Untitled.csv')
+    expect(doc.handle).toBeUndefined()
+    expect(doc.table.headers.length).toBe(BLANK_COLUMNS)
+    expect(doc.table.rowCount).toBe(BLANK_ROWS)
+    expect([...doc.table.orderedCells()].every((r) => r.every((v) => v === ''))).toBe(true)
+    expect(serializeDocument(doc).split('\n')[0]).toBe(','.repeat(BLANK_COLUMNS - 1))
   })
 })

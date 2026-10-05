@@ -1,6 +1,6 @@
 import { deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, setCell, sortRows, type Command } from './model/commands'
 import { parseTsv, squared, toTsv } from './model/clipboard'
-import { encodeDocumentAsync, type CsvDocument } from './document'
+import { blankDocument, encodeDocumentAsync, untitledName, type CsvDocument } from './document'
 import { hasFiles, openCsv, readDropped, saveCsv, saveCsvAs } from './files'
 import { History, type Outcome } from './model/history'
 import { nextErrorRow } from './model/errors'
@@ -70,6 +70,7 @@ const grid = new Grid($('grid-host'), {
 const tabBar = createTabBar($('tabs'), {
   onSelect: (id) => activate(tabs.find((t) => t.id === id)),
   onClose: (id) => void closeTab(tabs.find((t) => t.id === id)),
+  onNew: () => newDocument(),
 })
 
 /** The grid reads the view live, so a refresh is enough after any change. */
@@ -153,14 +154,19 @@ async function closeTab(tab: Tab | undefined): Promise<void> {
   else showMeta()
 }
 
+function addTab(doc: CsvDocument): Tab {
+  const tab: Tab = { id: nextTabId++, doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, version: 0, matches: undefined, state: undefined }
+  tabs.push(tab)
+  return tab
+}
+
 /** Opens each document in its own tab; a file that is already open is just brought into focus. */
 async function openDocuments(docs: CsvDocument[]): Promise<void> {
   let first: Tab | undefined
   for (const doc of docs) {
     let tab = await findOpenTab(doc)
     if (!tab) {
-      tab = { id: nextTabId++, doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, version: 0, matches: undefined, state: undefined }
-      tabs.push(tab)
+      tab = addTab(doc)
     }
     first ??= tab
   }
@@ -622,6 +628,13 @@ function confirmUtf8(doc: CsvDocument, chars: string[]): Promise<boolean> {
   })
 }
 
+/** A blank document in a new tab. It is not a file yet: nothing is written until it is saved. */
+function newDocument(): void {
+  grid.commitEdit()
+  const doc = blankDocument(untitledName(tabs.map((t) => t.doc.name)))
+  activate(addTab(doc))
+}
+
 async function open(): Promise<void> {
   await openDocuments(await openCsv())
 }
@@ -647,6 +660,7 @@ function report(err: unknown, title = 'Something went wrong'): void {
 // --- menus ------------------------------------------------------------------------------
 
 const actions: Record<string, () => void | Promise<void>> = {
+  new: newDocument,
   open,
   save: () => save(false),
   'save-as': () => save(true),

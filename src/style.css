@@ -220,7 +220,7 @@ body.filling, body.filling * { cursor: crosshair !important; user-select: none; 
 /* Document tabs */
 #toolbar { padding-bottom: 0; align-items: flex-end; min-height: 38px; }
 .menu { align-self: flex-end; } /* on the same line as the tabs */
-#tabs { display: flex; flex: 1; min-width: 0; gap: 2px; align-items: flex-end; overflow-x: auto; scrollbar-width: none; }
+#tabs { scroll-padding-right: 32px; display: flex; flex: 1; min-width: 0; gap: 2px; align-items: flex-end; overflow-x: auto; scrollbar-width: none; }
 #tabs::-webkit-scrollbar { display: none; }
 .tabs-empty { align-self: center; padding-bottom: 6px; color: var(--ink-subtle); }
 .tab { display: flex; flex: none; align-items: center; gap: 4px; max-width: 220px; height: 30px; padding: 0 4px 0 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 5px 5px 0 0; color: var(--ink-muted); cursor: pointer; user-select: none; }
@@ -228,6 +228,8 @@ body.filling, body.filling * { cursor: crosshair !important; user-select: none; 
 .tab.active { background: var(--surface); border-color: var(--line); color: var(--ink); font-weight: 600; margin-bottom: -1px; height: 31px; }
 .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab-close { flex: none; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--ink-subtle); font-size: 15px; line-height: 1; cursor: pointer; }
+.tab-new { position: sticky; right: 0; flex: none; align-self: center; display: grid; place-items: center; width: 26px; height: 26px; margin: 0 0 3px 2px; padding: 0; border: 0; border-radius: 5px; background: var(--chrome); color: var(--ink-muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.tab-new:hover { background: var(--chrome-hover); color: var(--ink); }
 .tab-close:hover { background: var(--chrome-hover); color: var(--ink); }
 
 /* Column resize handle: the right edge of a header */

@@ -9,6 +9,8 @@ export interface TabBarHandlers {
   onSelect(id: number): void
   /** Close was requested (button or middle click); the owner decides whether to ask first. */
   onClose(id: number): void
+  /** The + after the last tab was clicked. */
+  onNew(): void
 }
 
 /** Which tab to show after `closingId` is closed: the right neighbour, else the left, else none. */
@@ -28,6 +30,10 @@ export function createTabBar(host: HTMLElement, handlers: TabBarHandlers): { ren
   }
 
   host.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('.tab-new')) {
+      handlers.onNew()
+      return
+    }
     const id = idOf(e.target)
     if (id === undefined) return
     if ((e.target as Element).closest('.tab-close')) handlers.onClose(id)
@@ -48,11 +54,17 @@ export function createTabBar(host: HTMLElement, handlers: TabBarHandlers): { ren
 
   return {
     render(items) {
+      const plus = document.createElement('button')
+      plus.className = 'tab-new'
+      plus.tabIndex = -1
+      plus.title = 'New blank document'
+      plus.setAttribute('aria-label', 'New blank document')
+      plus.textContent = '+'
       if (items.length === 0) {
         const none = document.createElement('span')
         none.className = 'tabs-empty'
         none.textContent = 'No file open'
-        host.replaceChildren(none)
+        host.replaceChildren(none, plus)
         return
       }
       host.replaceChildren(
@@ -75,6 +87,7 @@ export function createTabBar(host: HTMLElement, handlers: TabBarHandlers): { ren
           tab.append(name, close)
           return tab
         }),
+        plus,
       )
       revealActive()
     },

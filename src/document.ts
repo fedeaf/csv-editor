@@ -23,6 +23,32 @@ export function loadDocument(name: string, bytes: Uint8Array, handle?: FileSyste
   }
 }
 
+export const BLANK_COLUMNS = 255
+export const BLANK_ROWS = 65535
+
+/** The first "Untitled.csv", "Untitled 2.csv"… that none of `taken` already uses. */
+export function untitledName(taken: string[]): string {
+  const used = new Set(taken.map((n) => n.toLowerCase()))
+  for (let n = 1; ; n++) {
+    const name = n === 1 ? 'Untitled.csv' : `Untitled ${n}.csv`
+    if (!used.has(name.toLowerCase())) return name
+  }
+}
+
+/**
+ * A new empty document that lives only in memory: it has no file handle, so nothing reaches the
+ * disk until the user saves it (Save asks where, as Save As does).
+ */
+export function blankDocument(name: string): CsvDocument {
+  const row = () => Array<string>(BLANK_COLUMNS).fill('')
+  return {
+    name,
+    table: new Table(row(), Array.from({ length: BLANK_ROWS }, row)),
+    format: { encoding: 'utf-8', bom: false, delimiter: ',', lineEnding: '\n', trailingNewline: true },
+    warnings: [],
+  }
+}
+
 export function serializeDocument(doc: CsvDocument): string {
   const { delimiter, lineEnding, trailingNewline } = doc.format
   return serializeCsv(doc.table.headers, doc.table.orderedCells(), { delimiter, lineEnding, trailingNewline })
