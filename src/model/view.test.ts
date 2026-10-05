@@ -248,3 +248,57 @@ describe('spreadsheet errors in a column', () => {
     expect(stat.duplicateValues).toBe(1)
   })
 })
+
+describe('statistics of columns with nothing in them', () => {
+  const make = () => {
+    const table = new Table(['a', 'b', 'c'], [['x', '', 'y'], ['x', '', ''], ['z', '', 'y']])
+    return { table, view: new TableView(table) }
+  }
+  it('are the same as counting them: every row blank, nothing repeated, no errors', () => {
+    const { table, view } = make()
+    const blank = view.stats.get(table.colIds[1]!)
+    expect(blank.counts).toEqual(new Map([['', 3]]))
+    expect(blank).toMatchObject({ duplicateValues: 0, duplicateRows: 0, errorCells: 0, errorExamples: [] })
+    // and columns with text are still counted
+    expect(view.stats.get(table.colIds[0]!)).toMatchObject({ duplicateValues: 1, duplicateRows: 2 })
+    expect(view.stats.get(table.colIds[2]!).counts.get('y')).toBe(2)
+  })
+  it('have no counts at all in a table without rows', () => {
+    const table = new Table(['a'], [])
+    expect(new TableView(table).stats.get(table.colIds[0]!).counts.size).toBe(0)
+  })
+  it('stop being blank when a cell is typed in, and become blank again when it is cleared', () => {
+    const { table, view } = make()
+    const history = new History()
+    const colId = table.colIds[1]!
+    view.stats.get(colId) // swept and cached as blank
+    const rowId = view.visible[0]!
+    const outcome = history.execute(setCell(table, rowId, 1, '#N/A'), table)
+    view.stats.invalidate(outcome.command.invalidates)
+    expect(view.stats.get(colId)).toMatchObject({ errorCells: 1, errorExamples: ['#N/A'] })
+    expect(view.stats.get(colId).counts.get('')).toBe(2)
+    const back = history.undo(table)!
+    view.stats.invalidate(back.command.invalidates)
+    expect(view.stats.get(colId).counts).toEqual(new Map([['', 3]]))
+    expect(view.stats.get(colId).errorCells).toBe(0)
+  })
+  it('are noticed again after rows are added or removed', () => {
+    const { table, view } = make()
+    const colId = table.colIds[1]!
+    view.stats.get(colId)
+    const history = new History()
+    const out = history.execute(insertRows(table, 0, 2), table)
+    view.stats.invalidate(out.command.invalidates)
+    view.afterChange(undefined)
+    expect(view.stats.get(colId).counts.get('')).toBe(5)
+  })
+  it('include a column added after the first look', () => {
+    const { table, view } = make()
+    view.stats.get(table.colIds[0]!)
+    const history = new History()
+    const out = history.execute(insertColumn(table, 1), table)
+    view.stats.invalidate(out.command.invalidates)
+    const added = table.colIds[1]!
+    expect(view.stats.get(added).counts).toEqual(new Map([['', 3]]))
+  })
+})

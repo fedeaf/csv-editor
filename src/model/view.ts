@@ -30,21 +30,82 @@ const MAX_ERROR_EXAMPLES = 3
 
 export class ColumnStats {
   private cache = new Map<number, ColumnStat>()
+  /**
+   * Whether each column holds nothing at all, by column id. A column with no text has the same statistics
+   * whatever its length, so it is told apart first, in one pass over the rows for every column together,
+   * instead of counting its values one by one (a new document has 255 of them).
+   */
+  private blank = new Map<number, boolean>()
+  private swept = false
 
   constructor(private table: Table) {}
 
   get(colId: number): ColumnStat {
     let stat = this.cache.get(colId)
     if (!stat) {
-      stat = this.compute(this.table.columnIndex(colId))
+      const col = this.table.columnIndex(colId)
+      stat = this.isBlank(colId, col) ? this.blankStat() : this.compute(col)
       this.cache.set(colId, stat)
     }
     return stat
   }
 
   invalidate(which: number[] | 'all' | 'none'): void {
-    if (which === 'all') this.cache.clear()
-    else if (which !== 'none') for (const id of which) this.cache.delete(id)
+    if (which === 'all') {
+      this.cache.clear()
+      this.blank.clear()
+      this.swept = false
+    } else if (which !== 'none') {
+      for (const id of which) {
+        this.cache.delete(id)
+        this.blank.delete(id)
+      }
+    }
+  }
+
+  private isBlank(colId: number, col: number): boolean {
+    if (col < 0) return false
+    if (!this.swept) this.sweep()
+    let blank = this.blank.get(colId)
+    if (blank === undefined) {
+      // Only this column's text changed since the sweep: look at it alone, stopping at the first value.
+      blank = true
+      for (const id of this.table.order) {
+        if (this.table.rowById(id)!.cells[col] !== '') {
+          blank = false
+          break
+        }
+      }
+      this.blank.set(colId, blank)
+    }
+    return blank
+  }
+
+  /** One pass over the rows that finds which columns have text anywhere; it stops once every column has some. */
+  private sweep(): void {
+    const { colIds, columnCount } = this.table
+    const blank = new Array<boolean>(columnCount).fill(true)
+    let remaining = columnCount
+    for (const id of this.table.order) {
+      const cells = this.table.rowById(id)!.cells
+      for (let c = 0; c < columnCount; c++) {
+        if (blank[c] && cells[c] !== '') {
+          blank[c] = false
+          if (--remaining === 0) break
+        }
+      }
+      if (remaining === 0) break
+    }
+    colIds.forEach((colId, c) => {
+      if (!this.blank.has(colId)) this.blank.set(colId, blank[c]!)
+    })
+    this.swept = true
+  }
+
+  /** The statistics of a column whose every cell is empty. */
+  private blankStat(): ColumnStat {
+    const rows = this.table.rowCount
+    return { counts: rows > 0 ? new Map([['', rows]]) : new Map(), duplicateValues: 0, duplicateRows: 0, errorCells: 0, errorExamples: [] }
   }
 
   private compute(col: number): ColumnStat {
