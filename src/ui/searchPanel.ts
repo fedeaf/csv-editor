@@ -33,6 +33,7 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
   root.hidden = true
   root.setAttribute('role', 'search')
   root.innerHTML = `
+    <div class="sp-grip" title="Drag to move. Double-click to put it back."></div>
     <div class="sp-row">
       <input type="text" class="sp-input" placeholder="Find in visible rows" aria-label="Find" spellcheck="false">
       <label class="sp-exact"><input type="checkbox"> Match entire cell</label>
@@ -58,13 +59,60 @@ export function createSearchPanel(handlers: SearchPanelHandlers): SearchPanel {
   const syncReplaceButtons = () => replaceButtons.forEach((b) => (b.disabled = input.value === ''))
   syncReplaceButtons()
 
+  // --- moving the panel -------------------------------------------------------------------
+  // Dragging the strip on its left, or any part of it that is not a control, moves it within the
+  // area of the table. Until it is moved it sits in the top right corner.
+
+  /** Puts the panel at `left`, `top` inside its area, never partly outside it. */
+  const place = (left: number, top: number) => {
+    const area = root.parentElement
+    if (!area) return
+    root.style.right = 'auto'
+    root.style.left = `${Math.max(0, Math.min(left, area.clientWidth - root.offsetWidth))}px`
+    root.style.top = `${Math.max(0, Math.min(top, area.clientHeight - root.offsetHeight))}px`
+  }
+  const moved = () => root.style.left !== ''
+  /** Keeps a moved panel in view when the area changes size or the panel opens or changes pane. */
+  const keepInside = () => {
+    if (moved() && !root.hidden) place(root.offsetLeft, root.offsetTop)
+  }
+  let drag: { x: number; y: number; left: number; top: number } | undefined
+  const isControl = (target: EventTarget | null) => !!(target as Element).closest('input, button, label')
+  // The text field keeps the focus while the panel is dragged by its edge.
+  root.addEventListener('mousedown', (e) => {
+    if (!isControl(e.target)) e.preventDefault()
+  })
+  root.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || isControl(e.target)) return
+    drag = { x: e.clientX, y: e.clientY, left: root.offsetLeft, top: root.offsetTop }
+    root.setPointerCapture(e.pointerId)
+    document.body.classList.add('moving-panel')
+  })
+  root.addEventListener('pointermove', (e) => {
+    if (drag) place(drag.left + e.clientX - drag.x, drag.top + e.clientY - drag.y)
+  })
+  const drop = () => {
+    drag = undefined
+    document.body.classList.remove('moving-panel')
+  }
+  root.addEventListener('pointerup', drop)
+  root.addEventListener('pointercancel', drop)
+  root.querySelector('.sp-grip')!.addEventListener('dblclick', () => {
+    root.style.left = root.style.top = root.style.right = ''
+  })
+  const watcher = new ResizeObserver(keepInside)
+
   const panel: SearchPanel = {
     // In the area of the table, so that it sits under the column headers and follows the table around.
     mount(host) {
+      watcher.disconnect()
       host.append(root)
+      watcher.observe(host)
+      keepInside()
     },
     open() {
       root.hidden = false
+      keepInside()
       input.focus()
       input.select()
     },

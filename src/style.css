@@ -213,7 +213,11 @@ body.filling, body.filling * { cursor: crosshair !important; user-select: none; 
  * (28px, with a small gap), so the headers stay in view and only the first rows are covered.
  */
 :root { --find-width: min(600px, calc(100vw - 48px)); }
-.search-panel { position: absolute; z-index: 35; top: calc(28px + 4px); right: 24px; width: var(--find-width); padding: 3px 4px 3px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-panel); }
+.search-panel { position: absolute; z-index: 35; top: calc(28px + 4px); right: 24px; width: var(--find-width); max-width: calc(100% - 32px); padding: 3px 4px 3px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-panel); cursor: grab; }
+.search-panel label, .search-panel .sp-message { cursor: default; }
+.sp-grip { position: absolute; left: 0; top: 0; bottom: 0; width: 14px; border-radius: 4px 0 0 4px; background: radial-gradient(circle, var(--ink-subtle) 1.1px, transparent 1.5px) 2px 0 / 4px 6px repeat-y, radial-gradient(circle, var(--ink-subtle) 1.1px, transparent 1.5px) 7px 0 / 4px 6px repeat-y; opacity: 0.6; }
+.sp-grip:hover { opacity: 1; }
+body.moving-panel, body.moving-panel * { cursor: grabbing !important; user-select: none; }
 .search-panel[hidden] { display: none; }
 .sp-row { display: flex; align-items: center; gap: 8px; height: 24px; }
 .sp-row + .sp-row { margin-top: 4px; }
