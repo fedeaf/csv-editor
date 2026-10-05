@@ -17,8 +17,7 @@
 
   /* surfaces and lines */
   --surface: light-dark(#fff, #202124);
-  --crosshair: light-dark(rgb(26 115 232 / 7%), rgb(138 180 248 / 9%)); /* the row and column of the cell selected, over whatever they are */
-  --surface-alt: light-dark(#fafafa, #25262a); /* every other grid row */
+  --row-here: light-dark(rgb(26 115 232 / 5%), rgb(138 180 248 / 6%)); /* the row of the cell selected, over whatever it is */
   --chrome: light-dark(#f1f3f4, #2b2c2f); /* toolbar, headers, row numbers, status bar */
   --chrome-hover: light-dark(#dadce0, #3c4043);
   --chrome-hover-soft: light-dark(#e4e7ea, #34363a);
@@ -107,8 +106,7 @@ body.resizing-rows, body.resizing-rows * { cursor: row-resize !important; user-s
 .grid-header { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: var(--grid-cols); background: var(--chrome); border-bottom: 1px solid var(--line); }
 .grid-body { position: relative; }
 .grid-row { position: absolute; left: 0; right: 0; display: grid; grid-template-columns: var(--grid-cols); border-bottom: 1px solid var(--line-soft); }
-.grid-row.alt { background: var(--surface-alt); }
-.grid-row.here, .cell.here-col { background-image: linear-gradient(var(--crosshair), var(--crosshair)); }
+.grid-row.here { background-image: linear-gradient(var(--row-here), var(--row-here)); }
 
 .row-number, .header-cell, .cell { flex: none; padding: 0 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 25px; }
 .header-cell, .cell { border-right: 1px solid var(--line-soft); }

@@ -50,7 +50,6 @@ function contrast(t: Theme, a: string, b: string): number {
 const pairs: [string, string, number][] = [
   ['ink', 'surface', 4.5],
   ['ink', 'chrome', 4.5],
-  ['ink', 'surface-alt', 4.5],
   ['ink-muted', 'surface', 4.5],
   ['ink-muted', 'chrome', 4.5],
   ['ink-subtle', 'surface', 4.5],
