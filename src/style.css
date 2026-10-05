@@ -150,7 +150,7 @@ body.resizing-rows, body.resizing-rows * { cursor: row-resize !important; user-s
 .cell.sel-l { --sel-l: inset 2px 0 0 var(--selection-edge); }
 .cell.sel-r { --sel-r: inset -2px 0 0 var(--selection-edge); }
 .cell.active { outline: 2px solid var(--selection-edge); outline-offset: -2px; background: var(--surface); position: relative; z-index: 1; }
-.cell.selected.active { background: var(--surface); }
+.cell.selected.active { background: var(--selection-fill); } /* the active cell of a block is filled like the rest; its outline marks it */
 .row-number.active, .header-cell.active { background: var(--selection-header); color: var(--ink); }
 .header-cell.band { background: var(--selection-header-strong); }
 /* 2px border + 6px padding = the 8px a cell has: the text does not shift when editing starts, and a text that just fits the cell does not wrap. */
