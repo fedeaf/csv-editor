@@ -48,7 +48,7 @@ undo, redo and Find only act on the tab in focus.
 | `Ctrl` + arrow | Jump to the first or last row or column |
 | `Shift` + arrow | Extend the selection by one cell |
 | `Ctrl+Shift` + arrow | Extend the selection to the end of the row or column |
-| `Ctrl+A` | Select everything |
+| `Ctrl+A` | Select everything (the view stays where it is) |
 | `Ctrl+C`, `Ctrl+X`, `Ctrl+V` | Copy, cut, paste |
 | `F2`, or typing | Edit the cell (`Alt+Enter` adds a line break inside it) |
 | `Enter` / `Tab` / `Esc` in a cell | Confirm and move down / confirm and move right / cancel |
@@ -63,6 +63,7 @@ undo, redo and Find only act on the tab in focus.
 - A single value pasted over several selected cells fills all of them.
 - Nothing is cut off. Lines that do not fit become new rows at the end of the table, and a block that
   is too wide adds columns with a blank header. The status bar says what was added.
+- After a paste the pasted block is selected and the view stays where it was, even if the block is far longer than the screen.
 - Every copy, cut, paste and delete is a single undo step.
 
 ## Development

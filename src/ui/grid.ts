@@ -276,14 +276,14 @@ export class Grid {
     }
   }
 
-  /** Selects a block, with the cursor at its top-left cell (used to show what a paste filled). */
-  selectRange(r0: number, c0: number, r1: number, c1: number): void {
+  /** Selects a block, active cell at its start. `reveal` scrolls to its far corner; without it the view stays put. */
+  selectRange(r0: number, c0: number, r1: number, c1: number, reveal = true): void {
     const model = this.model
     if (!model || model.rowCount === 0) return
     this.active = { row: clamp(r0, model.rowCount - 1), col: clamp(c0, model.headers.length - 1) }
     this.extent = { row: clamp(r1, model.rowCount - 1), col: clamp(c1, model.headers.length - 1) }
     this.band = null
-    this.ensureVisible(this.extent.row, this.extent.col)
+    if (reveal) this.ensureVisible(this.extent.row, this.extent.col)
     this.paint()
   }
 
@@ -504,7 +504,7 @@ export class Grid {
         case 'ArrowRight': return handled(), this.setActive(this.active.row, lastCol)
         case 'a':
         case 'A':
-          return handled(), this.selectRange(0, 0, lastRow, lastCol)
+          return handled(), this.selectRange(0, 0, lastRow, lastCol, false)
       }
       return
     }

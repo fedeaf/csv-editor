@@ -529,7 +529,8 @@ function pasteText(text: string): boolean {
     return true
   }
   run(command)
-  grid.selectRange(rect.r0, rect.c0, rect.r0 + height - 1, rect.c0 + width - 1)
+  // The view stays where it was: a pasted column can be far longer than the screen.
+  grid.selectRange(rect.r0, rect.c0, rect.r0 + height - 1, rect.c0 + width - 1, false)
   const added = [
     tab.view.rowCount > rowsBefore ? plural(tab.view.rowCount - rowsBefore, 'row') : '',
     table.columnCount > colsBefore ? plural(table.columnCount - colsBefore, 'column') : '',
