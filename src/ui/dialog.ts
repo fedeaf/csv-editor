@@ -14,7 +14,11 @@ export interface DialogOptions {
   cancelLabel?: string | null
   /** The main button discards something: it is drawn in red and the focus starts on Cancel. */
   danger?: boolean
+  /** Label of a third, green button that keeps the work (Save); it goes last, after the main one. */
+  saveLabel?: string
 }
+
+type Choice = 'ok' | 'cancel' | 'save'
 
 let open = false
 let queue: Promise<unknown> = Promise.resolve()
@@ -36,12 +40,32 @@ export async function messageDialog(title: string, message: string): Promise<voi
 
 // One at a time: a second dialog waits for the first to be answered.
 function show(options: DialogOptions): Promise<boolean> {
+  return showChoice(options).then((choice) => choice === 'ok')
+}
+
+function showChoice(options: DialogOptions): Promise<Choice> {
   const result = queue.then(() => render(options))
   queue = result.catch(() => undefined)
   return result
 }
 
-function render({ title, message, confirmLabel = 'OK', cancelLabel = null, danger = false }: DialogOptions): Promise<boolean> {
+/**
+ * Asks what to do with a document that has unsaved changes: save them, throw them away, or cancel.
+ * The focus starts on Cancel, so a key pressed in a hurry changes nothing.
+ */
+export async function saveOrDiscardDialog(options: { title: string; message: string; saveLabel?: string; discardLabel: string }): Promise<'save' | 'discard' | 'cancel'> {
+  const choice = await showChoice({
+    title: options.title,
+    message: options.message,
+    confirmLabel: options.discardLabel,
+    saveLabel: options.saveLabel ?? 'Save',
+    cancelLabel: 'Cancel',
+    danger: true,
+  })
+  return choice === 'ok' ? 'discard' : choice
+}
+
+function render({ title, message, confirmLabel = 'OK', cancelLabel = null, danger = false, saveLabel }: DialogOptions): Promise<Choice> {
   return new Promise((resolve) => {
     const previous = document.activeElement as HTMLElement | null
     const backdrop = document.createElement('div')
@@ -62,11 +86,12 @@ function render({ title, message, confirmLabel = 'OK', cancelLabel = null, dange
     main.className = danger ? 'danger-button' : 'primary-button'
     const cancel = cancelLabel === null ? undefined : Object.assign(document.createElement('button'), { textContent: cancelLabel })
     cancel?.classList.add('secondary-button')
-    actions.append(...(cancel ? [cancel, main] : [main]))
+    const save = saveLabel === undefined ? undefined : Object.assign(document.createElement('button'), { textContent: saveLabel, className: 'save-button' })
+    actions.append(...(cancel ? [cancel, main] : [main]), ...(save ? [save] : []))
     dialog.append(heading, body, actions)
     backdrop.append(dialog)
 
-    const close = (answer: boolean) => {
+    const close = (answer: Choice) => {
       document.removeEventListener('keydown', onKey, true)
       backdrop.remove()
       open = false
@@ -78,7 +103,7 @@ function render({ title, message, confirmLabel = 'OK', cancelLabel = null, dange
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') {
         e.preventDefault()
-        close(false)
+        close('cancel')
       } else if (e.key === 'Tab') {
         e.preventDefault()
         const buttons = [...dialog.querySelectorAll('button')]
@@ -87,10 +112,11 @@ function render({ title, message, confirmLabel = 'OK', cancelLabel = null, dange
       }
       e.stopPropagation()
     }
-    main.addEventListener('click', () => close(true))
-    cancel?.addEventListener('click', () => close(false))
+    main.addEventListener('click', () => close('ok'))
+    save?.addEventListener('click', () => close('save'))
+    cancel?.addEventListener('click', () => close('cancel'))
     // Clicking the dim area outside the dialog cancels it, as Escape does.
-    backdrop.addEventListener('mousedown', (e) => e.target === backdrop && close(false))
+    backdrop.addEventListener('mousedown', (e) => e.target === backdrop && close('cancel'))
 
     open = true
     document.addEventListener('keydown', onKey, true)

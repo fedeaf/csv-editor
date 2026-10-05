@@ -49,6 +49,8 @@
   --ok: light-dark(#34a853, #81c995); /* no duplicates */
   --ok-bg: light-dark(#e1f3e5, #1f3a29); /* "No blanks" and "No duplicates" in the status bar */
   --ok-ink: light-dark(#176b2c, #81c995);
+  --save: light-dark(#1e7e34, #81c995); /* the green button that saves */
+  --save-strong: light-dark(#176b2c, #a8dab5);
   --danger: light-dark(#c5221f, #f28b82); /* no matches, and a button that discards */
   --danger-strong: light-dark(#a50e0e, #f6aea9);
   --scrim: light-dark(rgb(32 33 36 / 45%), rgb(0 0 0 / 60%)); /* the dim layer behind a dialog */
@@ -310,6 +312,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .danger-button { border: 1px solid var(--danger); background: var(--danger); color: var(--accent-ink); }
 .danger-button:hover { background: var(--danger-strong); border-color: var(--danger-strong); }
 .dialog-actions button:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+.save-button:focus-visible { outline-color: var(--ok-bg); }
+.save-button { border: 1px solid var(--save); background: var(--save); color: var(--accent-ink); }
+.save-button:hover { background: var(--save-strong); border-color: var(--save-strong); }
 .danger-button:focus-visible { outline-color: var(--warn-bg-hover); }
 
 /* Short movements, so that things do not just appear: menus, dialogs, and the cell a jump lands on. */

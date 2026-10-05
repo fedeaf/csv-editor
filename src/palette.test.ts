@@ -57,6 +57,8 @@ const pairs: [string, string, number][] = [
   ['accent', 'surface', 4.5],
   ['accent-ink', 'accent', 4.5], // the text of a primary button
   ['accent-ink', 'danger', 4.5], // the text of a button that discards
+  ['accent-ink', 'save', 4.5], // the text of the green button that saves
+  ['accent-ink', 'save-strong', 4.5],
   ['ink', 'selection-fill', 4.5],
   ['ink', 'selection-header', 4.5],
   ['ink', 'selection-header-strong', 4.5],

@@ -12,7 +12,7 @@ import { closeContextMenu, showContextMenu, type MenuItem } from './ui/contextMe
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
 import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
 import { Grid, type FillRequest, type GridHandlers, type GridModel, type GridState, type Rect } from './ui/grid'
-import { confirmDialog, formatDialog, isDialogOpen, messageDialog } from './ui/dialog'
+import { confirmDialog, formatDialog, isDialogOpen, messageDialog, saveOrDiscardDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
 import { createAccumulator, type Summary } from './model/summary'
 import { fileInfo, plural, selectionSummary, summaryText, type SummaryChip } from './ui/status'
@@ -331,14 +331,15 @@ async function closeTab(tab: Tab | undefined): Promise<void> {
   panes.find((p) => p.tab === tab)?.grid.commitEdit() // an unfinished edit counts as a change
   if (tab.history.dirty) {
     closing.add(tab)
-    const discard = await confirmDialog({
+    const choice = await saveOrDiscardDialog({
       title: `Close "${tab.doc.name}"?`,
-      message: 'It has unsaved changes. If you close it, they will be lost.',
-      confirmLabel: 'Close and discard',
-      danger: true,
+      message: 'It has unsaved changes. Save them, or they will be lost if you close it.',
+      discardLabel: 'Close and discard',
     })
+    // Saving can still be given up (the Save As window cancelled), and then the tab stays open.
+    const saved = choice === 'save' && tabs.includes(tab) ? await saveTab(tab, false).catch((e) => (report(e), false)) : false
     closing.delete(tab)
-    if (!discard || !tabs.includes(tab)) {
+    if (choice === 'cancel' || (choice === 'save' && !saved) || !tabs.includes(tab)) {
       if (current) grid.focus() // back to the table, not to the × that was clicked
       return
     }
@@ -957,16 +958,21 @@ async function open(): Promise<void> {
 
 /** Saves the tab in focus only. The tab is captured up front: the dialog or write may take a while. */
 async function save(as: boolean): Promise<void> {
-  const tab = current
-  if (!tab) return
-  grid.commitEdit()
+  if (current) await saveTab(current, as)
+}
+
+/** Saves one tab, which need not be the one in focus. False if nothing was written (cancelled, or declined UTF-8). */
+async function saveTab(tab: Tab, as: boolean): Promise<boolean> {
+  const holder = panes.find((p) => p.tab === tab)
+  ;(holder ? holder.grid : grid).commitEdit()
   const encoded = await encodeDocumentAsync(tab.doc, (chars) => confirmUtf8(tab.doc, chars))
-  if (!encoded) return
+  if (!encoded) return false
   const saved = await (as ? saveCsvAs(tab.doc, encoded.bytes) : saveCsv(tab.doc, encoded.bytes))
-  if (!saved) return
+  if (!saved) return false
   tab.doc.format = encoded.format
   tab.history.markSaved()
   showMeta(tab === current ? `Saved ${tab.doc.name}` : undefined)
+  return true
 }
 
 /** True when two formats write a document the same way. */
