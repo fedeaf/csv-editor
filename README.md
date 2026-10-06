@@ -7,6 +7,12 @@ always act on whole rows.
 It ships as **one self-contained HTML file**, [`dist/index.html`](dist/index.html). Open it in
 Chrome by double-clicking it. No server, no install, nothing to download.
 
+> **Your data never leaves the computer.** The page makes no network request of any kind, and the built file
+> carries a Content-Security-Policy that makes the browser refuse one: no fetch, XHR, WebSocket, beacon, frame, worker,
+> font or remote image, and no script or style other than the two blocks of the file itself (allowed by their hash).
+> Code that tried to send something, ours or a library's, would be stopped by Chrome and not by our goodwill. The
+> development server (`npm run dev`) has no such policy, since it needs its own socket.
+
 > **Chrome only.** Opening and saving over the original file uses Chrome's File System Access API.
 > Other browsers are not supported, and there is no mobile or responsive layout.
 
