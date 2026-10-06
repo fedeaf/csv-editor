@@ -1,5 +1,5 @@
 // The AutoFilter dropdown (FIL-01): a "Duplicates only" switch, the column's unique values with
-// checkboxes, "Select All" and "(Blanks)". Changes are drafted and applied with OK.
+// checkboxes, "Select All" and "-[ Blanks ]-". Changes are drafted and applied with OK.
 
 export interface FilterEntry {
   value: string
@@ -9,7 +9,7 @@ export interface FilterEntry {
 
 export interface FilterDropdownOptions {
   anchor: HTMLElement
-  /** Unique values alphabetical, with "(Blanks)" last when the column has blank cells. */
+  /** "-[ Blanks ]-" first when the column has blank cells, then the unique values alphabetical. */
   entries: FilterEntry[]
   /** Currently allowed values, or null when every value is allowed. */
   selected: Set<string> | null

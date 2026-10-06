@@ -945,7 +945,7 @@ function openFilter(col: number, anchor: HTMLElement): void {
   const stat = view.stats.get(colId)
   const { values, blanks } = uniqueValues(stat)
   const entries: FilterEntry[] = values.map((v) => ({ value: v.value, label: v.value, count: v.count }))
-  if (blanks > 0) entries.push({ value: '', label: '(Blanks)', count: blanks })
+  if (blanks > 0) entries.unshift({ value: '', label: '-[ Blanks ]-', count: blanks }) // first, in brackets so it cannot be taken for a value
   const existing = view.filters.get(colId)
   showFilterDropdown({
     anchor,

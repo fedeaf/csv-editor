@@ -64,7 +64,7 @@ Each requirement has an ID for referencing in tickets and milestones. Items mark
 
 | ID | Requirement |
 | --- | --- |
-| FIL-01 | AutoFilter button on every header. Opens a dropdown listing the column's unique values, each with a checkbox, plus "Select All" and "(Blanks)". |
+| FIL-01 | AutoFilter button on every header. Opens a dropdown listing the column's unique values, each with a checkbox, plus "Select All" and "-[ Blanks ]-", which is the first entry of the list and written in brackets so it cannot be taken for a value. |
 | FIL-02 | Filters on several columns combine: a row is shown only if it matches all of them. |
 | FIL-03 | "Duplicates only" option in the dropdown: shows rows whose value in that column appears more than once (equality rule, D-05). |
 | FIL-04 | Visual indicator on filtered columns. Clear the filter per column, and clear all filters. |
@@ -235,7 +235,7 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- [x] The dropdown lists the column's unique values, including "(Blanks)".
+- [x] The dropdown lists the column's unique values, including "-[ Blanks ]-" (first).
 - [x] Filters on two columns combine correctly.
 - [x] "Duplicates only" shows only rows whose value repeats in that column.
 - [x] Filtered columns are visually marked and clearing the filter restores all rows.
