@@ -1,4 +1,4 @@
-import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, setCell, sortRows, type Command } from './model/commands'
+import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, setCell, setHeaders, sortRows, type Command } from './model/commands'
 import { parseTsv, squared, toTsv } from './model/clipboard'
 import { blankDocument, encodeDocumentAsync, loadDocument, untitledName, type CsvDocument } from './document'
 import { hasFiles, openCsv, readDropped, readSource, saveCsv, saveCsvAs } from './files'
@@ -666,6 +666,41 @@ async function copyFromMenu(cut: boolean): Promise<void> {
 }
 
 /** Paste from the context menu. The browser asks for permission to read the clipboard the first time. */
+/** Puts the names of the headers of columns `from` to `to` on the clipboard as one line, to paste them in another file. */
+async function copyHeaders(from: number, to: number): Promise<void> {
+  const tab = current
+  if (!tab) return
+  const names = tab.doc.table.headers.slice(from, to + 1)
+  try {
+    await navigator.clipboard.writeText(toTsv([names]))
+  } catch {
+    report(new Error('The browser did not let the page write to the clipboard.'), 'Could not copy')
+    return
+  }
+  showMeta(`Copied ${plural(names.length, 'header')}`)
+}
+
+/** Takes the first line of the clipboard as header names and gives them to the columns from `col` on, adding columns if they run out. */
+async function pasteHeaders(col: number): Promise<void> {
+  const tab = current
+  if (!tab) return
+  let text: string
+  try {
+    text = await navigator.clipboard.readText()
+  } catch {
+    report(new Error('The browser did not let the page read the clipboard.'), 'Could not paste')
+    return
+  }
+  const names = parseTsv(text)[0]
+  const command = names && setHeaders(tab.doc.table, col, names)
+  if (!command) return showMeta('The headers are already those', true)
+  const columnsBefore = tab.doc.table.columnCount
+  run(command)
+  const added = tab.doc.table.columnCount - columnsBefore
+  grid.selectRange(0, col, tab.view.rowCount - 1, col + names.length - 1, false)
+  showMeta(`Pasted ${plural(names.length, 'header')}${added > 0 ? ` (added ${plural(added, 'column')})` : ''}`)
+}
+
 async function pasteFromMenu(): Promise<void> {
   let text: string
   try {
@@ -1121,7 +1156,14 @@ function editItems(rect: Rect): MenuItem[] {
 function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): MenuItem[] {
   const table = tab.doc.table
   const v = tab.view
-  if (kind === 'corner') return [{ label: 'Insert row at top', run: () => run(insertRows(table, 0, 1)) }]
+  if (kind === 'corner') {
+    return [
+      { label: 'Copy all headers', run: () => void copyHeaders(0, table.columnCount - 1) },
+      { label: 'Paste headers', run: () => void pasteHeaders(0) },
+      { separator: true },
+      { label: 'Insert row at top', run: () => run(insertRows(table, 0, 1)) },
+    ]
+  }
   if (kind === 'cell') {
     const rect = grid.selection()
     const ids = v.visible.slice(rect.r0, rect.r1 + 1)
@@ -1155,6 +1197,9 @@ function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): Menu
   const [from, to] = grid.selectedCols()
   return [
     ...editItems(grid.selection()),
+    { label: from === to ? 'Copy header' : 'Copy headers', run: () => void copyHeaders(from, to) },
+    { label: 'Paste headers', run: () => void pasteHeaders(from) },
+    { separator: true },
     { label: 'Insert column left', run: () => run(insertColumn(table, from)) },
     { label: 'Insert column right', run: () => run(insertColumn(table, to + 1)) },
     {

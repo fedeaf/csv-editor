@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, renameHeader, setCell } from './commands'
+import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, renameHeader, setCell, setHeaders } from './commands'
 import { History } from './history'
 import { Table, type FileFormat } from './table'
 
@@ -160,5 +160,39 @@ describe('the names that undo and redo report', () => {
     const targets = [{ rowId: table.order[0]!, col: 0 }]
     expect(fillCells(table, targets, 'q')!.label).toBe('Fill')
     expect(fillCells(table, targets, 'q', 'Clear contents')!.label).toBe('Clear contents')
+  })
+})
+
+describe('setHeaders', () => {
+  it('renames the headers from a column on, as one undo step', () => {
+    const table = make()
+    const history = new History()
+    const command = setHeaders(table, 1, ['x', 'y'])!
+    history.execute(command, table)
+    expect(table.headers).toEqual(['a', 'x', 'y'])
+    history.undo(table)
+    expect(table.headers).toEqual(['a', 'b', 'c'])
+  })
+  it('adds columns, with blank cells, for the names that do not fit, and takes them away on undo', () => {
+    const table = make()
+    const history = new History()
+    history.execute(setHeaders(table, 2, ['z', 'p', 'q'])!, table)
+    expect(table.headers).toEqual(['a', 'b', 'z', 'p', 'q'])
+    expect(table.rowAt(0)!.cells).toEqual(['1', '2', '3', '', ''])
+    expect(table.colIds.length).toBe(5)
+    history.undo(table)
+    expect(table.headers).toEqual(['a', 'b', 'c'])
+    expect(table.rowAt(0)!.cells).toEqual(['1', '2', '3'])
+    history.redo(table)
+    expect(table.headers).toEqual(['a', 'b', 'z', 'p', 'q'])
+  })
+  it('fills the whole header of an empty table of blank headers', () => {
+    const table = new Table(['', '', '', ''], [['', '', '', '']])
+    setHeaders(table, 0, ['id', 'name'])!.run(table)
+    expect(table.headers).toEqual(['id', 'name', '', ''])
+  })
+  it('does nothing when the names are already there', () => {
+    expect(setHeaders(make(), 0, ['a', 'b'])).toBeUndefined()
+    expect(setHeaders(make(), 0, [])).toBeUndefined()
   })
 })

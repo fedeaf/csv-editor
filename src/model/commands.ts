@@ -115,6 +115,34 @@ export function insertColumn(table: Table, index: number): Command {
   }
 }
 
+/**
+ * Gives the headers of the columns from `col0` on the names in `names`. Names beyond the last column add
+ * columns, blank apart from their header, so the whole header of another file fits. One undo step;
+ * undefined if nothing would change.
+ */
+export function setHeaders(table: Table, col0: number, names: string[]): Command | undefined {
+  const existing = Math.max(0, Math.min(names.length, table.columnCount - col0))
+  const before = table.headers.slice(col0, col0 + existing)
+  const added = names.slice(existing)
+  const same = before.every((name, i) => name === names[i])
+  if (same && added.length === 0) return undefined
+  const ids = added.map(() => table.newColumnId())
+  return {
+    label: 'Paste headers',
+    invalidates: 'none',
+    run: (t) => {
+      names.slice(0, existing).forEach((name, i) => (t.headers[col0 + i] = name))
+      if (added.length > 0) t.insertColumns(t.columnCount, added, undefined, ids)
+      return { col: col0 }
+    },
+    revert: (t) => {
+      if (added.length > 0) t.removeColumns(t.columnCount - added.length, added.length)
+      before.forEach((name, i) => (t.headers[col0 + i] = name))
+      return { col: col0 }
+    },
+  }
+}
+
 /** Deletes columns `from` to `to`, both inclusive. */
 export function deleteColumns(from: number, to: number): Command {
   const count = to - from + 1
