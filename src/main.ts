@@ -166,9 +166,20 @@ const strips = ([0, 1] as const).map((side) =>
   }),
 )
 
+/** Puts the name of the document's file (as the tab shows it) on the clipboard. */
+async function copyFileName(tab: Tab): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(tab.doc.name)
+  } catch {
+    report(new Error('The browser did not let the page write to the clipboard.'), 'Could not copy')
+    return
+  }
+  showMeta(`Copied "${tab.doc.name}"`)
+}
+
 /** The right-click menu of a tab. */
 function tabItems(tab: Tab): MenuItem[] {
-  const items: MenuItem[] = []
+  const items: MenuItem[] = [{ label: 'Copy file name', run: () => void copyFileName(tab) }, { separator: true }]
   if (layout === 'side') {
     items.push({ label: tab.side === 0 ? 'Move to the right panel' : 'Move to the left panel', run: () => moveTab(tab, tab.side === 0 ? 1 : 0) })
     items.push({ separator: true })
