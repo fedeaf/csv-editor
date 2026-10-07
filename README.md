@@ -113,9 +113,20 @@ How it holds together:
 - Filters are a derived view over the table and are not part of the history.
 - The grid is virtualized: only the rows in view, plus a small buffer, are in the DOM.
 
+## License
+
+Copyright (C) 2026 fedeaf.
+
+CSV Editor is free software: you can redistribute it and modify it under the terms of the GNU Affero General Public
+License as published by the Free Software Foundation, either version 3 of the License or (at your option) any later
+version (`AGPL-3.0-or-later`). It is distributed in the hope that it will be useful, but without any warranty. See
+[LICENSE](LICENSE) for the full text. The built `dist/index.html` states the same at its top, with the address of this
+repository where the source is.
+
 ## Third-party software
 
-The CSV is read with [Papa Parse](https://www.papaparse.com), which is MIT licensed. Its license text is written at the
+The CSV is read with [Papa Parse](https://www.papaparse.com), which is MIT licensed (compatible with the AGPL, and
+it keeps its own license inside the combined work). Its license text is written at the
 top of the built `dist/index.html` and in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Status and limits

@@ -34,7 +34,7 @@ function singleFile(): Plugin {
 }
 
 /**
- * The built file carries Papa Parse's code, and its MIT license asks for its copyright notice and permission text
+ * The built file starts with our own copyright and license, and carries Papa Parse's code, whose MIT license asks for its copyright notice and permission text
  * to go with every copy. The minifier drops comments, so the text is read from the installed package and written
  * at the top of the file as an HTML comment, which the page never shows and the policy below does not touch.
  */
@@ -42,7 +42,8 @@ function addNotices(source: string): string {
   const dir = dirname(createRequire(import.meta.url).resolve('papaparse'))
   const { version } = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { version: string }
   const license = readFileSync(join(dir, 'LICENSE'), 'utf8').trim().replaceAll('--', '- -')
-  const notice = `<!--\nThis file includes Papa Parse ${version} (https://www.papaparse.com), used under the MIT license:\n\n${license}\n-->`
+  const own = 'CSV Editor. Copyright (C) 2026 fedeaf.\nFree software under the GNU Affero General Public License, version 3 or (at your option) any later version\n(AGPL-3.0-or-later). The source code is at https://github.com/fedeaf/csv-editor and the full text of the\nlicense is in its LICENSE file.'
+  const notice = `<!--\n${own}\n\nThis file includes Papa Parse ${version} (https://www.papaparse.com), used under the MIT license:\n\n${license}\n-->`
   return source.replace(/^(<!doctype html>)/i, (_, doctype: string) => `${doctype}\n${notice}`)
 }
 

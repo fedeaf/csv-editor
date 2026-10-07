@@ -2,6 +2,9 @@
   "name": "csv-editor",
   "private": true,
   "version": "0.1.0",
+  "author": "fedeaf",
+  "license": "AGPL-3.0-or-later",
+  "repository": "github:fedeaf/csv-editor",
   "type": "module",
   "scripts": {
     "dev": "vite",

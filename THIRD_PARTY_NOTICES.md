@@ -1,6 +1,7 @@
 # Third-party notices
 
-CSV Editor includes the following software, which keeps its own license.
+CSV Editor is copyright (C) 2026 fedeaf and licensed under the AGPL-3.0-or-later (see `LICENSE`). It includes the
+following software, which keeps its own license; the MIT license of Papa Parse is compatible with the AGPL.
 
 ## Papa Parse
 
