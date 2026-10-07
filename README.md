@@ -113,6 +113,11 @@ How it holds together:
 - Filters are a derived view over the table and are not part of the history.
 - The grid is virtualized: only the rows in view, plus a small buffer, are in the DOM.
 
+## Third-party software
+
+The CSV is read with [Papa Parse](https://www.papaparse.com), which is MIT licensed. Its license text is written at the
+top of the built `dist/index.html` and in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Status and limits
 
 All seven milestones of [the specification](CSV%20Editor%20MVP%20Specification.md) are done, and its

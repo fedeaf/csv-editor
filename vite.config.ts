@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 
 /** Inlines the built JS and CSS into index.html so the result is one file that works from file://. */
@@ -25,9 +28,22 @@ function singleFile(): Plugin {
           delete bundle[name]
         }
       }
-      html.source = addPolicy(source)
+      html.source = addNotices(addPolicy(source))
     },
   }
+}
+
+/**
+ * The built file carries Papa Parse's code, and its MIT license asks for its copyright notice and permission text
+ * to go with every copy. The minifier drops comments, so the text is read from the installed package and written
+ * at the top of the file as an HTML comment, which the page never shows and the policy below does not touch.
+ */
+function addNotices(source: string): string {
+  const dir = dirname(createRequire(import.meta.url).resolve('papaparse'))
+  const { version } = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { version: string }
+  const license = readFileSync(join(dir, 'LICENSE'), 'utf8').trim().replaceAll('--', '- -')
+  const notice = `<!--\nThis file includes Papa Parse ${version} (https://www.papaparse.com), used under the MIT license:\n\n${license}\n-->`
+  return source.replace(/^(<!doctype html>)/i, (_, doctype: string) => `${doctype}\n${notice}`)
 }
 
 const sha256 = (text: string) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`
