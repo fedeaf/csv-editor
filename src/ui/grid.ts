@@ -1,5 +1,6 @@
 import { clampWidth, columnAt, columnOffsets, fitWidth, longestStrings } from './columns'
 import { editorSpan } from './editorSpan'
+import { joinParts, rectContains, subtractRect } from './rects'
 
 const ROW_HEIGHT = 26
 const HEADER_HEIGHT = 28
@@ -70,7 +71,8 @@ export interface GridHandlers {
   /** A column was dragged (or fitted) to a new width: the owner keeps it. */
   onColumnResize(col: number, width: number): void
   /** Delete or Backspace over the selection. */
-  onClear(rect: Rect): void
+  /** Delete was pressed over the selection: one block, or several when rows or columns were added with Ctrl. */
+  onClear(rects: Rect[]): void
   onSort(col: number, dir: 'asc' | 'desc'): void
   onFilter(col: number, anchor: HTMLElement): void
   onDuplicates(col: number): void
@@ -82,7 +84,7 @@ export interface GridHandlers {
   onContextMenu(kind: 'rows' | 'cols' | 'corner' | 'cell', clientX: number, clientY: number): void
 }
 
-/** Whole rows or whole columns selected by their number or header; `end` is the moving side. */
+/** Whole rows or whole columns selected by their number or header; `end` is the moving side. With Ctrl, more can be added. */
 interface Band {
   type: 'rows' | 'cols'
   anchor: number
@@ -124,6 +126,11 @@ export class Grid {
   /** The other corner of a cell selection: the block runs from `active` to `extent`. */
   private extent: Pos | null = null
   private band: Band | null = null
+  /**
+   * The other parts of a selection made of several, added with Ctrl: blocks of cells and whole rows or columns. The
+   * part being made, the one the active cell belongs to, is `band` or the block from `active` to `extent`.
+   */
+  private others: Rect[] = []
   private editing: Editing | null = null
   /** Set when a press landed on the only cell selected, in a table that already had the focus: a click, not a drag, edits it. */
   private clickToEdit: Pos | null = null
@@ -181,7 +188,7 @@ export class Grid {
     this.model = model
     this.active = state ? { ...state.active } : { row: 0, col: 0 }
     this.extent = state?.extent ? { ...state.extent } : null
-    this.band = null
+    this.clearBand()
     this.scroller.scrollTo(0, 0)
     this.refresh()
     if (state) this.scroller.scrollTo(state.scrollLeft, state.scrollTop)
@@ -223,7 +230,7 @@ export class Grid {
         this.extent = { row: clamp(this.extent.row, model.rowCount - 1), col: clamp(this.extent.col, columns - 1) }
       }
     }
-    this.band = null
+    this.clearBand()
     this.paintHeader()
     this.placeFillHandle()
     this.scheduleRender()
@@ -280,13 +287,89 @@ export class Grid {
     }
   }
 
+  /**
+   * Everything that is selected, as blocks that do not overlap: one, unless parts were added with Ctrl (cells, or rows
+   * or columns chosen apart). Whole rows that touch are joined into one block, and so are whole columns.
+   */
+  ranges(): Rect[] {
+    const current = this.selection()
+    if (this.others.length === 0) return [current]
+    const { lastRow, lastCol } = this.limits()
+    return joinParts([...this.others.flatMap((r) => subtractRect(r, current)), current], lastRow, lastCol)
+  }
+
+  private limits(): { lastRow: number; lastCol: number } {
+    const model = this.model
+    return { lastRow: Math.max(0, (model?.rowCount ?? 1) - 1), lastCol: Math.max(0, (model?.headers.length ?? 1) - 1) }
+  }
+
+  /** Forgets the rows or columns selected by number, and the other parts of the selection. */
+  private clearBand(): void {
+    this.band = null
+    this.others = []
+  }
+
+  /** Makes a block the part being made, as the grid left it: whole rows, whole columns, or a block of cells. */
+  private adopt(r: Rect): void {
+    const { lastRow, lastCol } = this.limits()
+    if (r.c0 === 0 && r.c1 === lastCol) {
+      this.band = { type: 'rows', anchor: r.r0, end: r.r1 }
+      this.active = { row: r.r0, col: Math.min(this.active.col, lastCol) }
+      this.extent = null
+    } else if (r.r0 === 0 && r.r1 === lastRow) {
+      this.band = { type: 'cols', anchor: r.c0, end: r.c1 }
+      this.active = { row: Math.min(this.active.row, lastRow), col: r.c0 }
+      this.extent = null
+    } else {
+      this.band = null
+      this.active = { row: r.r0, col: r.c0 }
+      this.extent = r.r1 > r.r0 || r.c1 > r.c0 ? { row: r.r1, col: r.c1 } : null
+    }
+  }
+
+  /** Takes a block out of the selection, which is left as it was if that would leave nothing selected. */
+  private removeFromSelection(block: Rect): void {
+    const rest = this.ranges().flatMap((r) => subtractRect(r, block))
+    const last = rest.pop()
+    if (!last) return
+    this.others = rest
+    this.adopt(last)
+    this.paint()
+  }
+
+  /** Ctrl+click on a row number or header: adds the row or column, or takes it out if it is selected. True if added. */
+  private toggleBand(type: Band['type'], index: number): boolean {
+    if (this.inBand(type, index)) {
+      const { lastRow, lastCol } = this.limits()
+      this.removeFromSelection(type === 'rows' ? { r0: index, r1: index, c0: 0, c1: lastCol } : { r0: 0, r1: lastRow, c0: index, c1: index })
+      return false
+    }
+    this.selectBand(type, index, false, true)
+    return true
+  }
+
+  /** Ctrl+click on a cell: adds it as a part of its own, or takes it out of the selection if it is in it. True if added. */
+  private toggleCell(row: number, col: number): boolean {
+    const parts = this.ranges()
+    if (parts.some((r) => rectContains(r, row, col))) {
+      this.removeFromSelection({ r0: row, r1: row, c0: col, c1: col })
+      return false
+    }
+    this.others = parts
+    this.band = null
+    this.active = { row, col }
+    this.extent = null
+    this.paint()
+    return true
+  }
+
   /** Selects a block, active cell at its start. `reveal` scrolls to its far corner; without it the view stays put. */
   selectRange(r0: number, c0: number, r1: number, c1: number, reveal = true): void {
     const model = this.model
     if (!model || model.rowCount === 0) return
     this.active = { row: clamp(r0, model.rowCount - 1), col: clamp(c0, model.headers.length - 1) }
     this.extent = { row: clamp(r1, model.rowCount - 1), col: clamp(c1, model.headers.length - 1) }
-    this.band = null
+    this.clearBand()
     if (reveal) this.ensureVisible(this.extent.row, this.extent.col)
     this.paint()
   }
@@ -329,7 +412,7 @@ export class Grid {
     if (!model) return
     this.active = { row: clamp(row, model.rowCount - 1), col: clamp(col, model.headers.length - 1) }
     this.extent = null
-    this.band = null
+    this.clearBand()
     if (scroll) this.ensureVisible(this.active.row, this.active.col)
     this.paint()
   }
@@ -557,13 +640,13 @@ export class Grid {
       case 'End': return handled(), this.setActive(this.active.row, model.headers.length - 1)
       case 'F2': return handled(), this.startCellEdit(false)
       case 'Escape':
-        this.band = null
+        this.clearBand()
         this.extent = null
         return this.paint()
       case 'Delete':
       case 'Backspace':
         handled()
-        if (model.rowCount > 0 && model.headers.length > 0) this.handlers.onClear(this.selection())
+        if (model.rowCount > 0 && model.headers.length > 0) this.handlers.onClear(this.ranges())
         return
     }
     // Typing starts an edit that replaces the content. The key is not cancelled: the editor takes
@@ -649,6 +732,10 @@ export class Grid {
     if (!hit) return
     switch (hit.zone) {
       case 'cell':
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          if (this.toggleCell(hit.row, hit.col)) this.startSelectDrag('cells', e)
+          break
+        }
         // Pressing the cell that is already the whole selection, with no Shift, and when the table had the
         // focus (so a click that only brings the focus back does not edit), is a click to edit if it is released
         // without moving.
@@ -658,10 +745,18 @@ export class Grid {
         this.startSelectDrag('cells', e)
         break
       case 'rowNumber':
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          if (this.toggleBand('rows', hit.row)) this.startSelectDrag('rows', e)
+          break
+        }
         this.selectBand('rows', hit.row, e.shiftKey)
         this.startSelectDrag('rows', e)
         break
       case 'header':
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          if (this.toggleBand('cols', hit.col)) this.startSelectDrag('cols', e)
+          break
+        }
         this.selectBand('cols', hit.col, e.shiftKey)
         this.startSelectDrag('cols', e)
         break
@@ -673,11 +768,18 @@ export class Grid {
     e.preventDefault() // no text selection while clicking and dragging over the grid
   }
 
-  private selectBand(type: Band['type'], index: number, extend: boolean): void {
+  /**
+   * Selects the row or column `index`. With `extend` (Shift) the current run grows to it; with `add` (Ctrl) it is a new
+   * part next to the ones already chosen; otherwise it replaces the selection.
+   */
+  private selectBand(type: Band['type'], index: number, extend: boolean, add = false): void {
     const model = this.model!
     const keep = this.band?.type === type ? this.band.anchor : type === 'rows' ? this.active.row : this.active.col
     const anchor = extend ? keep : index
+    // With Ctrl the parts so far are kept, and with Shift too (the run being made grows); a plain click starts again.
+    const kept = extend ? this.others : add ? this.ranges() : []
     this.band = { type, anchor, end: index }
+    this.others = kept
     this.extent = null
     // The active cell follows the clicked line so keyboard use continues from there.
     if (type === 'rows') this.active = { row: anchor, col: clamp(this.active.col, model.headers.length - 1) }
@@ -730,8 +832,7 @@ export class Grid {
     } else if (hit.zone === 'cell') {
       // A cell inside the selection keeps it, so the menu acts on all of it; any other cell becomes the selection.
       this.commitEdit()
-      const { r0, r1, c0, c1 } = this.selection()
-      const inside = hit.row >= r0 && hit.row <= r1 && hit.col >= c0 && hit.col <= c1
+      const inside = this.ranges().some((r) => rectContains(r, hit.row, hit.col))
       if (!inside) this.setActive(hit.row, hit.col)
       this.focus()
       e.preventDefault()
@@ -848,7 +949,7 @@ export class Grid {
   /** The handle sits on the bottom-right corner of the active cell, when it is the only one selected. */
   private placeFillHandle(): void {
     const model = this.model
-    const single = !this.band && (!this.extent || (this.extent.row === this.active.row && this.extent.col === this.active.col))
+    const single = !this.band && this.others.length === 0 && (!this.extent || (this.extent.row === this.active.row && this.extent.col === this.active.col))
     const show = !!model && model.rowCount > 0 && model.headers.length > 0 && !this.editing && single
     this.fillHandle.hidden = !show
     if (!show) return
@@ -961,10 +1062,12 @@ export class Grid {
     if (apply && moved) this.handlers.onFill({ row: d.row, col: d.col, toRow: d.target.row, toCol: d.target.col })
   }
 
+  /** Whether the whole row or column is selected (as a run of its own or as part of one). */
   private inBand(type: Band['type'], index: number): boolean {
-    if (this.band?.type !== type) return false
-    const [from, to] = bandRange(this.band)
-    return index >= from && index <= to
+    const { lastRow, lastCol } = this.limits()
+    return this.ranges().some((r) =>
+      type === 'rows' ? r.c0 === 0 && r.c1 === lastCol && index >= r.r0 && index <= r.r1 : r.r0 === 0 && r.r1 === lastRow && index >= r.c0 && index <= r.c1,
+    )
   }
 
   /** Draws the cells again with their marks (search matches) as they stand now, leaving the rest alone. */
@@ -973,34 +1076,35 @@ export class Grid {
   }
 
   private paintRow(node: HTMLElement, index: number): void {
-    const { r0, c0, r1, c1 } = this.selection()
-    const inRows = index >= r0 && index <= r1
-    const block = r1 > r0 || c1 > c0 // a single cell is shown by its outline alone
-    node.firstElementChild!.classList.toggle('active', inRows)
+    const rects = this.ranges()
+    const only = rects[0]!
+    const block = rects.length > 1 || only.r1 > only.r0 || only.c1 > only.c0 // a single cell is shown by its outline alone
+    node.firstElementChild!.classList.toggle('active', rects.some((r) => index >= r.r0 && index <= r.r1))
     // With a single cell selected, its row is tinted faintly, to find it again at a glance.
     const single = !this.band && !block
     node.classList.toggle('here', single && index === this.active.row)
+    const inRows = rects.filter((r) => index >= r.r0 && index <= r.r1)
     const cells = node.children
     for (let c = 1; c < cells.length; c++) {
       const col = c - 1
-      const inBlock = block && inRows && col >= c0 && col <= c1
+      // The block this cell is in, if any: its outline goes on the cells along the block's edges.
+      const rect = block ? inRows.find((r) => col >= r.c0 && col <= r.c1) : undefined
       const classes = cells[c]!.classList
       classes.toggle('active', index === this.active.row && col === this.active.col)
-      classes.toggle('selected', inBlock)
+      classes.toggle('selected', !!rect)
       classes.toggle('match', this.model?.isMatch?.(index, col) ?? false)
-      // The outline of the block goes on the cells along its edges.
-      classes.toggle('sel-t', inBlock && index === r0)
-      classes.toggle('sel-b', inBlock && index === r1)
-      classes.toggle('sel-l', inBlock && col === c0)
-      classes.toggle('sel-r', inBlock && col === c1)
+      classes.toggle('sel-t', !!rect && index === rect.r0)
+      classes.toggle('sel-b', !!rect && index === rect.r1)
+      classes.toggle('sel-l', !!rect && col === rect.c0)
+      classes.toggle('sel-r', !!rect && col === rect.c1)
     }
   }
 
   private paintHeader(): void {
-    const { c0, c1 } = this.selection()
+    const rects = this.ranges()
     const cells = this.header.children
     for (let c = 1; c < cells.length; c++) {
-      cells[c]!.classList.toggle('active', c - 1 >= c0 && c - 1 <= c1)
+      cells[c]!.classList.toggle('active', rects.some((r) => c - 1 >= r.c0 && c - 1 <= r.c1))
       cells[c]!.classList.toggle('band', this.inBand('cols', c - 1))
     }
   }
@@ -1106,7 +1210,7 @@ export class Grid {
   /** True when the cell is the active one and nothing else is selected. */
   private isOnlySelected(row: number, col: number): boolean {
     const e = this.extent
-    const single = !this.band && (!e || (e.row === this.active.row && e.col === this.active.col))
+    const single = !this.band && this.others.length === 0 && (!e || (e.row === this.active.row && e.col === this.active.col))
     return single && this.active.row === row && this.active.col === col
   }
 

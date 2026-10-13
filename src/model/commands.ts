@@ -166,6 +166,27 @@ export function deleteColumns(from: number, to: number): Command {
 }
 
 /**
+ * Several commands as one step: run in the order given and reverted the other way round. Delete columns that are
+ * not next to each other with the last ones first, so that the numbers of the earlier ones stay right.
+ */
+export function sequence(label: string, commands: Command[]): Command {
+  return {
+    label,
+    invalidates: 'none',
+    run: (t) => {
+      let cursor: Cursor | void = undefined
+      for (const command of commands) cursor = command.run(t)
+      return cursor
+    },
+    revert: (t) => {
+      let cursor: Cursor | void = undefined
+      for (const command of [...commands].reverse()) cursor = command.revert(t)
+      return cursor
+    },
+  }
+}
+
+/**
  * Sorts all rows by a column (ORD-02: there is no single-column sort). Returns undefined when
  * the order would not change. The new order is stored so redo is exact.
  */

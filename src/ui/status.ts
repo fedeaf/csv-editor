@@ -7,12 +7,21 @@ import type { Rect } from './grid'
 
 export const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`
 
-/** "Selected 3 rows × 2 columns (6 cells)", or nothing when at most one cell is selected. */
-export function selectionSummary(rect: Rect, rowsShown: number): string {
-  const rows = rect.r1 - rect.r0 + 1
-  const cols = rect.c1 - rect.c0 + 1
-  if (rowsShown === 0 || rows * cols < 2) return ''
-  return `Selected ${plural(rows, 'row')} × ${plural(cols, 'column')} (${plural(rows * cols, 'cell')})`
+/**
+ * "Selected 3 rows × 2 columns (6 cells)", or nothing when at most one cell is selected. Parts chosen apart, with
+ * Ctrl, count together: rows chosen apart, or columns, as one block would; parts of other shapes as "9 cells in 3 parts".
+ */
+export function selectionSummary(rects: Rect[], rowsShown: number): string {
+  const first = rects[0]
+  if (!first || rowsShown === 0) return ''
+  const cells = rects.reduce((n, r) => n + (r.r1 - r.r0 + 1) * (r.c1 - r.c0 + 1), 0)
+  if (cells < 2) return ''
+  const sameCols = rects.every((r) => r.c0 === first.c0 && r.c1 === first.c1)
+  const sameRows = rects.every((r) => r.r0 === first.r0 && r.r1 === first.r1)
+  if (!sameCols && !sameRows) return `Selected ${plural(cells, 'cell')} in ${plural(rects.length, 'part')}`
+  const rows = sameCols ? rects.reduce((n, r) => n + r.r1 - r.r0 + 1, 0) : first.r1 - first.r0 + 1
+  const cols = sameCols ? first.c1 - first.c0 + 1 : rects.reduce((n, r) => n + r.c1 - r.c0 + 1, 0)
+  return `Selected ${plural(rows, 'row')} × ${plural(cols, 'column')} (${plural(cells, 'cell')})`
 }
 
 export interface FileInfo {

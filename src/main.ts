@@ -1,6 +1,6 @@
-import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, setCell, setHeaders, sortRows, type Command } from './model/commands'
+import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, sequence, setCell, setHeaders, sortRows, type Command } from './model/commands'
 import { parseTsv, squared, toTsv } from './model/clipboard'
-import { blankDocument, encodeDocumentAsync, loadDocument, untitledName, type CsvDocument } from './document'
+import { blankDocument, copyName, encodeDocumentAsync, loadDocument, untitledName, type CsvDocument } from './document'
 import { hasFiles, openCsv, readDropped, readSource, saveCsv, saveCsvAs } from './files'
 import { DELIMITER_NAMES, encodingLabel } from './model/formatOptions'
 import { History, type Outcome } from './model/history'
@@ -130,7 +130,7 @@ const GRID_HANDLERS: GridHandlers = {
   onDuplicates: toggleDuplicates,
   onWarning: goToError,
   onFill: fill,
-  onClear: (rect) => clearCells(rect),
+  onClear: (rects) => clearCells(rects),
   onColumnResize: (col, width) => current?.view.widths.set(current.doc.table.colIds[col]!, width),
   onSelectionChange: () => {
     setStatusMessage(undefined) // the selection took over from the last message
@@ -392,19 +392,37 @@ function addTab(doc: CsvDocument): Tab {
   return tab
 }
 
-/** Opens each document in its own tab; a file that is already open is just brought into focus. */
-async function openDocuments(docs: CsvDocument[]): Promise<void> {
+/**
+ * Opens each document in its own tab. A file that is already open is brought into focus; with `askForCopy` (a file
+ * dropped on the window, or chosen in the Open dialog) the user is first asked whether to open a copy of it instead.
+ */
+async function openDocuments(docs: CsvDocument[], askForCopy = false): Promise<void> {
   let first: Tab | undefined
   for (const doc of docs) {
     let tab = await findOpenTab(doc)
-    if (!tab) {
-      tab = addTab(doc)
-    }
+    if (tab && askForCopy && (await wantsCopy(doc))) tab = addTab(await detachedCopy(doc))
+    tab ??= addTab(doc)
     first ??= tab
   }
   if (!first) return
   if (first === current) showMeta()
   activate(first)
+}
+
+/** Asks whether to open a copy of a file that is already open; "No" goes to the tab that has it. */
+function wantsCopy(doc: CsvDocument): Promise<boolean> {
+  return confirmDialog({
+    title: `"${doc.name}" is already open`,
+    message: 'Open a copy of it in a new tab? The copy is not linked to the file: saving it asks where to save, so the original is not overwritten.',
+    confirmLabel: 'Open a copy',
+    cancelLabel: 'Show open tab',
+  })
+}
+
+/** The same content as its own document: no file behind it, and a name that tells it from the original. */
+async function detachedCopy(doc: CsvDocument): Promise<CsvDocument> {
+  const source = await readSource(doc)
+  return { ...doc, handle: undefined, source, name: copyName(doc.name, tabs.map((t) => t.doc.name)) }
 }
 
 /** The tab already showing this file, recognised by its file handle (the same file can have another name). */
@@ -443,15 +461,22 @@ const SYNC_CELLS = 5000 // up to here the count is made on the spot, with no pau
  * Counts the cells of `rect`. A big selection is counted a slice at a time so the page stays usable,
  * and a new selection (or a change in the cells) abandons the count in progress.
  */
-function summarize(tab: Tab, rect: Rect, key: string): void {
+function summarize(tab: Tab, rects: Rect[], key: string): void {
   const token = ++summaryToken
   window.clearTimeout(summaryTimer)
   const acc = createAccumulator()
   const table = tab.doc.table
-  let row = rect.r0
+  let part = 0 // the block being counted, and the row of it
+  let row = rects[0]!.r0
   const slice = (budget: number) => {
     const started = performance.now()
-    while (row <= rect.r1 && performance.now() - started < budget) {
+    while (part < rects.length && performance.now() - started < budget) {
+      const rect = rects[part]!
+      if (row > rect.r1) {
+        part++
+        row = rects[part]?.r0 ?? 0
+        continue
+      }
       const cells = table.rowById(tab.view.visible[row++]!)!.cells
       for (let c = rect.c0; c <= rect.c1; c++) acc.add(cells[c] ?? '')
     }
@@ -459,14 +484,14 @@ function summarize(tab: Tab, rect: Rect, key: string): void {
   const finish = () => {
     selectionStats = { key, summary: acc.result() }
   }
-  if ((rect.r1 - rect.r0 + 1) * (rect.c1 - rect.c0 + 1) <= SYNC_CELLS) {
+  if (rects.reduce((n, r) => n + (r.r1 - r.r0 + 1) * (r.c1 - r.c0 + 1), 0) <= SYNC_CELLS) {
     slice(Infinity)
     return finish() // the caller is showing the status bar and picks the result up
   }
   const step = () => {
     if (token !== summaryToken) return
     slice(12)
-    if (row <= rect.r1) {
+    if (part < rects.length) {
       summaryTimer = window.setTimeout(step)
     } else {
       finish()
@@ -483,13 +508,13 @@ function showActivity(): void {
   let detail = ''
   let chips: SummaryChip[] = []
   if (!statusMessage && current) {
-    const rect = grid.selection()
-    text = selectionSummary(rect, current.view.rowCount)
+    const rects = grid.ranges()
+    text = selectionSummary(rects, current.view.rowCount)
     if (text) {
-      const key = `${current.id}:${current.version}:${rect.r0},${rect.r1},${rect.c0},${rect.c1}`
+      const key = `${current.id}:${current.version}:${rects.map((r) => `${r.r0},${r.r1},${r.c0},${r.c1}`).join(';')}`
       if (selectionStats?.key !== key && key !== pendingKey) {
         pendingKey = key
-        summarize(current, rect, key)
+        summarize(current, rects, key)
       }
       if (selectionStats?.key === key) {
         const stats = summaryText(selectionStats.summary)
@@ -624,31 +649,57 @@ function cellsIn(tab: Tab, rect: Rect): { rowId: number; col: number }[] {
   return cells
 }
 
-/** Delete over a selection empties every cell in it, as one undo step. */
-function clearCells(rect: Rect): void {
+/** Delete over a selection (one block, or several chosen apart) empties every cell in it, as one undo step. */
+function clearCells(rects: Rect[]): void {
   if (!current) return
-  const command = fillCells(current.doc.table, cellsIn(current, rect), '', 'Clear contents')
+  const tab = current
+  const command = fillCells(tab.doc.table, rects.flatMap((rect) => cellsIn(tab, rect)), '', 'Clear contents')
   if (command) run(command)
 }
 
 const isTextField = (target: EventTarget | null) =>
   target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
 
-/** What the selection holds as text spreadsheets understand. Rows hidden by a filter are left out. */
-function selectionText(tab: Tab): { text: string; size: string; rect: Rect } | undefined {
-  const rect = grid.selection()
-  const rows: string[][] = []
-  for (let r = rect.r0; r <= rect.r1; r++) {
+/**
+ * What the selection holds as text spreadsheets understand. Rows hidden by a filter are left out. Parts chosen apart,
+ * with Ctrl, can be copied when they line up, as in Excel: rows one under another, columns one beside another. Parts
+ * that do not line up cannot, and the status bar says so.
+ */
+function selectionText(tab: Tab): { text: string; size: string; rects: Rect[] } | undefined {
+  const rects = grid.ranges()
+  const first = rects[0]!
+  const cellsOf = (r: number) => {
     const rowId = tab.view.idAt(r)
-    if (rowId !== undefined) rows.push(tab.doc.table.rowById(rowId)!.cells.slice(rect.c0, rect.c1 + 1))
+    return rowId === undefined ? undefined : tab.doc.table.rowById(rowId)!.cells
+  }
+  const sameCols = rects.every((r) => r.c0 === first.c0 && r.c1 === first.c1)
+  const sameRows = rects.every((r) => r.r0 === first.r0 && r.r1 === first.r1)
+  if (!sameCols && !sameRows) {
+    showMeta('That cannot be copied: the parts of the selection do not line up', true)
+    return undefined
+  }
+  const rows: string[][] = []
+  if (sameCols) {
+    for (const rect of rects) {
+      for (let r = rect.r0; r <= rect.r1; r++) {
+        const cells = cellsOf(r)
+        if (cells) rows.push(cells.slice(rect.c0, rect.c1 + 1))
+      }
+    }
+  } else {
+    for (let r = first.r0; r <= first.r1; r++) {
+      const cells = cellsOf(r)
+      if (cells) rows.push(rects.flatMap((rect) => cells.slice(rect.c0, rect.c1 + 1)))
+    }
   }
   if (rows.length === 0) return undefined
-  return { text: toTsv(rows), size: `${plural(rows.length, 'row')} × ${plural(rect.c1 - rect.c0 + 1, 'column')}`, rect }
+  const columns = sameCols ? first.c1 - first.c0 + 1 : rects.reduce((n, r) => n + r.c1 - r.c0 + 1, 0)
+  return { text: toTsv(rows), size: `${plural(rows.length, 'row')} × ${plural(columns, 'column')}`, rects }
 }
 
 /** After the text is on the clipboard: a cut empties what was taken, and the status bar says what happened. */
-function copied({ rect, size }: { rect: Rect; size: string }, cut: boolean): void {
-  if (cut) clearCells(rect)
+function copied({ rects, size }: { rects: Rect[]; size: string }, cut: boolean): void {
+  if (cut) clearCells(rects)
   showMeta(`${cut ? 'Cut' : 'Copied'} ${size}`)
 }
 
@@ -677,11 +728,17 @@ async function copyFromMenu(cut: boolean): Promise<void> {
 }
 
 /** Paste from the context menu. The browser asks for permission to read the clipboard the first time. */
-/** Puts the names of the headers of columns `from` to `to` on the clipboard as one line, to paste them in another file. */
-async function copyHeaders(from: number, to: number): Promise<void> {
+/** Deletes the columns of each run, the last run first so that the numbers of the others stay right; one undo step. */
+function deleteColumnRuns(spans: [number, number][]): Command {
+  const runs = [...spans].sort((a, b) => b[0] - a[0])
+  return runs.length === 1 ? deleteColumns(runs[0]![0], runs[0]![1]) : sequence('Delete columns', runs.map(([from, to]) => deleteColumns(from, to)))
+}
+
+/** Puts the names of the headers of the columns in each run on the clipboard as one line, to paste them in another file. */
+async function copyHeaders(spans: [number, number][]): Promise<void> {
   const tab = current
   if (!tab) return
-  const names = tab.doc.table.headers.slice(from, to + 1)
+  const names = spans.flatMap(([from, to]) => tab.doc.table.headers.slice(from, to + 1))
   try {
     await navigator.clipboard.writeText(toTsv([names]))
   } catch {
@@ -748,10 +805,12 @@ function pasteText(text: string): boolean {
   const rowsBefore = tab.view.rowCount
   const colsBefore = table.columnCount
 
-  if (height === 1 && width === 1 && (rect.r1 > rect.r0 || rect.c1 > rect.c0)) {
-    const command = fillCells(table, cellsIn(tab, rect), block[0]![0]!, 'Paste')
+  const rects = grid.ranges()
+  if (height === 1 && width === 1 && (rects.length > 1 || rect.r1 > rect.r0 || rect.c1 > rect.c0)) {
+    const targets = rects.flatMap((r) => cellsIn(tab, r))
+    const command = fillCells(table, targets, block[0]![0]!, 'Paste')
     if (command) run(command)
-    showMeta(`Pasted into ${plural((rect.r1 - rect.r0 + 1) * (rect.c1 - rect.c0 + 1), 'cell')}`)
+    showMeta(`Pasted into ${plural(targets.length, 'cell')}`)
     return true
   }
   const command = pasteCells(table, tab.view.visible.slice(rect.r0, rect.r0 + height), rect.c0, block)
@@ -1035,7 +1094,7 @@ function newDocument(): void {
 }
 
 async function open(): Promise<void> {
-  await openDocuments(await openCsv())
+  await openDocuments(await openCsv(), true)
 }
 
 /** Saves the tab in focus only. The tab is captured up front: the dialog or write may take a while. */
@@ -1153,13 +1212,13 @@ menuList.addEventListener('click', (e) => {
  * a cell has them too, together with cut, copy, paste and clear. They all act on what is selected.
  */
 /** Cut, copy, paste and clear, acting on the cells selected (a block, or the whole of the rows or columns chosen). */
-function editItems(rect: Rect): MenuItem[] {
+function editItems(rects: Rect[]): MenuItem[] {
   return [
     { label: 'Cut', hint: 'Ctrl+X', run: () => void copyFromMenu(true) },
     { label: 'Copy', hint: 'Ctrl+C', run: () => void copyFromMenu(false) },
     { label: 'Paste', hint: 'Ctrl+V', run: () => void pasteFromMenu() },
     { separator: true },
-    { label: 'Clear contents', hint: 'Delete', run: () => clearCells(rect) },
+    { label: 'Clear contents', hint: 'Delete', run: () => clearCells(rects) },
     { separator: true },
   ]
 }
@@ -1169,18 +1228,22 @@ function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): Menu
   const v = tab.view
   if (kind === 'corner') {
     return [
-      { label: 'Copy all headers', run: () => void copyHeaders(0, table.columnCount - 1) },
+      { label: 'Copy all headers', run: () => void copyHeaders([[0, table.columnCount - 1]]) },
       { label: 'Paste headers', run: () => void pasteHeaders(0) },
       { separator: true },
       { label: 'Insert row at top', run: () => run(insertRows(table, 0, 1)) },
     ]
+  }
+  if (kind === 'cell' && grid.ranges().length > 1) {
+    // Several parts chosen apart: what acts on cells works on all of them; inserting and deleting have no one place.
+    return editItems(grid.ranges()).slice(0, -1)
   }
   if (kind === 'cell') {
     const rect = grid.selection()
     const ids = v.visible.slice(rect.r0, rect.r1 + 1)
     const cols = rect.c1 - rect.c0 + 1
     return [
-      ...editItems(rect),
+      ...editItems([rect]),
       { label: 'Insert row above', run: () => run(insertRows(table, table.indexOfRow(ids[0]!), 1)) },
       { label: 'Insert row below', run: () => run(insertRows(table, table.indexOfRow(ids[ids.length - 1]!) + 1, 1)) },
       { label: ids.length > 1 ? `Delete ${ids.length} rows` : 'Delete row', run: () => run(deleteRows(ids)) },
@@ -1194,31 +1257,38 @@ function contextItems(tab: Tab, kind: 'rows' | 'cols' | 'corner' | 'cell'): Menu
       },
     ]
   }
+  // Rows and columns act on the whole rows or columns among what is selected, whatever else was added with Ctrl.
+  const all = grid.ranges()
+  const rects = all.filter((r) => (kind === 'rows' ? r.c0 === 0 && r.c1 === table.columnCount - 1 : r.r0 === 0 && r.r1 === v.rowCount - 1))
+  if (rects.length === 0) rects.push(grid.selection())
+  const apart = rects.length > 1 // rows or columns chosen apart, with Ctrl
   if (kind === 'rows') {
     // Rows are chosen among the visible ones; a new row goes next to its neighbour in the whole table.
-    const [from, to] = grid.selectedRows()
-    const ids = v.visible.slice(from, to + 1)
+    const ids = rects.flatMap((r) => v.visible.slice(r.r0, r.r1 + 1))
+    const first = v.visible.slice(rects[0]!.r0, rects[0]!.r1 + 1)
     return [
-      ...editItems(grid.selection()),
-      { label: 'Insert row above', run: () => run(insertRows(table, table.indexOfRow(ids[0]!), 1)) },
-      { label: 'Insert row below', run: () => run(insertRows(table, table.indexOfRow(ids[ids.length - 1]!) + 1, 1)) },
+      ...editItems(all),
+      { label: 'Insert row above', run: () => run(insertRows(table, table.indexOfRow(first[0]!), 1)), disabled: apart },
+      { label: 'Insert row below', run: () => run(insertRows(table, table.indexOfRow(first[first.length - 1]!) + 1, 1)), disabled: apart },
       { label: ids.length > 1 ? `Delete ${ids.length} rows` : 'Delete row', run: () => run(deleteRows(ids)) },
     ]
   }
-  const [from, to] = grid.selectedCols()
+  const spans = rects.map((r): [number, number] => [r.c0, r.c1])
+  const [from, to] = spans[0]!
+  const total = spans.reduce((n, [a, b]) => n + b - a + 1, 0)
   return [
-    ...editItems(grid.selection()),
-    { label: from === to ? 'Copy header' : 'Copy headers', run: () => void copyHeaders(from, to) },
+    ...editItems(all),
+    { label: total === 1 ? 'Copy header' : 'Copy headers', run: () => void copyHeaders(spans) },
     { label: 'Paste headers', run: () => void pasteHeaders(from) },
     { separator: true },
-    { label: 'Insert column left', run: () => run(insertColumn(table, from)) },
-    { label: 'Insert column right', run: () => run(insertColumn(table, to + 1)) },
+    { label: 'Insert column left', run: () => run(insertColumn(table, from)), disabled: apart },
+    { label: 'Insert column right', run: () => run(insertColumn(table, to + 1)), disabled: apart },
     {
-      label: to > from ? `Delete ${to - from + 1} columns` : 'Delete column',
-      run: () => run(deleteColumns(from, to)),
-      disabled: to - from + 1 >= table.columnCount, // a table keeps at least one column
+      label: total > 1 ? `Delete ${total} columns` : 'Delete column',
+      run: () => run(deleteColumnRuns(spans)),
+      disabled: total >= table.columnCount, // a table keeps at least one column
     },
-    { label: 'Rename header', run: () => grid.startHeaderEdit(from) },
+    { label: 'Rename header', run: () => grid.startHeaderEdit(from), disabled: apart || to > from },
   ]
 }
 
@@ -1289,7 +1359,7 @@ window.addEventListener('drop', (e) => {
   if (target) focusPane(target)
   readDropped(e.dataTransfer!)
     .then(async ({ docs, errors }) => {
-      await openDocuments(docs)
+      await openDocuments(docs, true)
       if (errors.length > 0) await messageDialog(errors.length === 1 ? 'A file was not opened' : 'Some files were not opened', errors.join('\n'))
     })
     .catch(report)

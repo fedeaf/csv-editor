@@ -53,6 +53,20 @@ export function untitledName(taken: string[]): string {
 }
 
 /**
+ * The name for a copy of `name`: the suffix goes before the extension and has no spaces or punctuation that a
+ * file name is better without. "report.csv" gives "report_copy1.csv", and if that is taken, "report_copy2.csv".
+ */
+export function copyName(name: string, taken: string[]): string {
+  const used = new Set(taken.map((n) => n.toLowerCase()))
+  const dot = name.lastIndexOf('.')
+  const [base, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, '']
+  for (let n = 1; ; n++) {
+    const candidate = `${base}_copy${n}${extension}`
+    if (!used.has(candidate.toLowerCase())) return candidate
+  }
+}
+
+/**
  * A new empty document that lives only in memory: it has no file handle, so nothing reaches the
  * disk until the user saves it (Save asks where, as Save As does).
  */

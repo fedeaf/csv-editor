@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Table } from './model/table'
-import { BLANK_COLUMNS, BLANK_ROWS, blankDocument, encodeDocumentAsync, loadDocument, serializeDocument, untitledName } from './document'
+import { copyName, BLANK_COLUMNS, BLANK_ROWS, blankDocument, encodeDocumentAsync, loadDocument, serializeDocument, untitledName } from './document'
 
 const latin1 = (text: string) => new Uint8Array(Buffer.from(text, 'latin1'))
 const windows1252 = () => loadDocument('t.csv', latin1('a,b\n1,\xe9\n')) // "1,é" in Windows-1252
@@ -80,5 +80,21 @@ describe('what is written', () => {
 
   it('writes only the header row when there are no rows with content', () => {
     expect(serializeDocument(doc(['a', 'b', ''], [['', '', ''], ['', '', '']]))).toBe('a,b\n')
+  })
+})
+
+describe('copyName', () => {
+  it('puts "_copy1" before the extension, with no spaces or brackets in what it adds', () => {
+    expect(copyName('report.csv', [])).toBe('report_copy1.csv')
+    expect(copyName('data.2024.csv', [])).toBe('data.2024_copy1.csv')
+    expect(copyName('report.csv', [])).toMatch(/^[A-Za-z0-9._-]+$/)
+  })
+  it('counts up when the name is taken, ignoring case', () => {
+    expect(copyName('report.csv', ['report_copy1.csv'])).toBe('report_copy2.csv')
+    expect(copyName('report.csv', ['Report_Copy1.CSV', 'report_copy2.csv'])).toBe('report_copy3.csv')
+  })
+  it('copes with a name that has no extension, or only a leading dot', () => {
+    expect(copyName('notes', [])).toBe('notes_copy1')
+    expect(copyName('.csv', [])).toBe('.csv_copy1')
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, renameHeader, setCell, setHeaders } from './commands'
+import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, renameHeader, sequence, setCell, setHeaders } from './commands'
 import { History } from './history'
 import { Table, type FileFormat } from './table'
 
@@ -194,5 +194,21 @@ describe('setHeaders', () => {
   it('does nothing when the names are already there', () => {
     expect(setHeaders(make(), 0, ['a', 'b'])).toBeUndefined()
     expect(setHeaders(make(), 0, [])).toBeUndefined()
+  })
+})
+
+describe('sequence', () => {
+  it('deletes columns that are not next to each other as one step, and puts them back on undo', () => {
+    const table = new Table(['a', 'b', 'c', 'd', 'e'], [['1', '2', '3', '4', '5']])
+    const history = new History()
+    // the last run first, so that the number of the first one stays right
+    history.execute(sequence('Delete columns', [deleteColumns(3, 3), deleteColumns(0, 0)]), table)
+    expect(table.headers).toEqual(['b', 'c', 'e'])
+    expect(table.rowAt(0)!.cells).toEqual(['2', '3', '5'])
+    history.undo(table)
+    expect(table.headers).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect(table.rowAt(0)!.cells).toEqual(['1', '2', '3', '4', '5'])
+    history.redo(table)
+    expect(table.headers).toEqual(['b', 'c', 'e'])
   })
 })
