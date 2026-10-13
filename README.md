@@ -94,13 +94,20 @@ history, switch and close tabs). It is not part of the production build.
 ### Structure
 
 ```
+index.html             the page: toolbar, menu, and a template for a pane (grid area and start screen)
+vite.config.ts         builds the single file: inlines script and style, adds the security policy and the notices
 src/
-  csv/        parsing, serializing and encoding detection (the part that must not corrupt data)
-  model/      table, commands with undo, history, filters and duplicate statistics, search, clipboard
-  ui/         grid, tab bar, filter dropdown, find panel, context menu
-  document.ts a file loaded into a table, and turning it back into bytes
-  files.ts    open, save and drag-and-drop with the File System Access API
-  main.ts     ties the tabs, the grid and the menus together
+  main.ts              ties the panes, tabs, grid, menus, search, copy and paste, save and dialogs together
+  document.ts          a file loaded into a table, a blank document, and turning it back into bytes
+  files.ts             open, save and drag-and-drop with the File System Access API
+  style.css            the palette (light and dark) and every style
+  csv/                 parsing, serializing, encodings and delimiters (the part that must not corrupt data)
+  model/               table, commands with undo, history, filters and column statistics, search, clipboard,
+                       errors and scientific notation, selection summary, format options
+  ui/                  grid (selection, editing, fill), tab bar, split divider, filter dropdown, find panel,
+                       dialogs, context menu, status bar texts, and small pure helpers (intervals, rects, columns)
+THIRD_PARTY_NOTICES.md Papa Parse's license; LICENSE is the AGPL
+CLAUDE.md              notes for whoever continues the work (conventions, how to verify, ideas not done yet)
 ```
 
 How it holds together:
@@ -134,7 +141,9 @@ top of the built `dist/index.html` and in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_N
 
 All seven milestones of [the specification](CSV%20Editor%20MVP%20Specification.md) are done, and its
 decisions D-01 to D-09 are closed there, each with what the editor does. On top of the original scope
-there are tabs, drag and drop, block selection, copy and paste, and the duplicate indicators.
+there is a long list of features (tabs and split view, multi-part selection, copy and paste, Find and Replace
+with regular expressions, file format choices, a summary of the selection, and more): the specification lists them
+under *Beyond the original scope*.
 
 The look comes from one palette, defined as named values at the top of
 [`src/style.css`](src/style.css), with each colour written once for both themes, and described in the
@@ -152,6 +161,9 @@ Known limits:
 - A file with mixed line endings is saved with the first one it uses.
 - Windows-1252 and ISO-8859-1 cannot be told apart automatically and are treated as one encoding. If
   you type a character that encoding cannot represent, the editor asks before saving as UTF-8.
-- The unit tests cover the model, the CSV handling, the clipboard format and a combined scenario
-  (filter, sort, search, fill, edit, paste, undo, save and reopen a Windows-1252 file). The interface
-  itself was checked by hand in Chrome, not with automated tests.
+- The unit tests cover the model, the CSV handling, the clipboard format, the status-bar texts and a combined
+  scenario (filter, sort, search, fill, edit, paste, undo, save and reopen a Windows-1252 file). The interface
+  has no automated tests; each feature was run in real Chrome and checked, as the specification's *Verification*
+  section describes.
+- Ctrl+click can take a selected part out of the selection, but the last part always stays; a selection in several
+  parts cannot be copied unless its parts line up (rows under rows, columns beside columns), as in Excel.

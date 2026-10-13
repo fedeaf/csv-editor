@@ -10,11 +10,11 @@ A web-based CSV editor with a spreadsheet-style interface, where every value is 
 | --- | --- |
 | Platform | Desktop web application. Chrome only. No mobile, tablet or responsive layout. |
 | Language | Everything in English: UI text, messages, code, identifiers and comments. |
-| Format | CSV only, for both opening and saving. |
+| Format | CSV for opening and saving; `.tsv` and `.txt` files open too, and the delimiter (comma, semicolon, tab, pipe) can be chosen by hand. |
 | Data types | Text only. No numbers, dates, formulas or arithmetic operations. |
-| Encodings | UTF-8, ASCII, Windows-1252 and ISO-8859-1, detected automatically. |
+| Encodings | UTF-8, ASCII, Windows-1252 and ISO-8859-1, detected automatically; UTF-16 is recognised by its byte order mark, and any of them can be chosen by hand (File Format). |
 | Design | Functional, Excel-inspired interface with a floating dropdown action menu. |
-| Approach | MVP. No defined file size limits, no exhaustive test suite, no optimization for edge cases. |
+| Approach | MVP. No defined file size limits, no exhaustive test suite, no optimization for edge cases. It has grown well beyond the MVP: see Beyond the original scope. |
 
 Guiding principle: no operation may misalign the values of a row. Sorting, filtering and searching always act on whole rows.
 
@@ -164,7 +164,7 @@ In Chrome, the labels "iso-8859-1", "latin1" and "ascii" are synonyms for Window
 
 - The browser's `TextEncoder` only encodes UTF-8 ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder)). Saving as Windows-1252 requires a custom encoder built on that encoding's 256-entry table.
 - Saving over the same file is feasible with Chrome's File System Access API (`showOpenFilePicker` and `showSaveFilePicker`). It requires HTTPS or localhost and a user gesture such as a click ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker)). The API is not available in other major browsers, which is acceptable because the target is Chrome only.
-- On save, quote only the fields that need it. Consequence: a file saved without edits may differ from the original in redundant quotes, even though the data is identical.
+- On save, quote only the fields that need it. Consequence: a file saved without edits may differ from the original in redundant quotes, even though the data is identical. The *Quotes* setting of File Format changes this to every field with content (see Beyond the original scope).
 
 ### Data model
 
@@ -339,10 +339,10 @@ Added after the MVP was specified:
 
 ## Verification
 
-- The model, the CSV handling and the clipboard format have unit tests (`npm test`).
+- The model, the CSV handling, the clipboard format, the status-bar texts and the pure helpers of the interface have unit tests (`npm test`).
 - `src/integration.test.ts` runs the H7 scenario on a Windows-1252 file with semicolons and CRLF: filter, sort, search, fill, edit, paste, undo two steps, save with the filter still on, reopen. The saved bytes are compared with the expected text, and the reopened table cell by cell.
-- The same scenario was run against the real application in Chrome with real clicks, key presses, drag of the fill handle and clipboard, and the saved file matched byte for byte.
-- The interface itself has no automated tests; it was checked by hand in Chrome.
+- The interface has no automated test suite, on purpose. Every feature was instead run against the real application in headless Chrome, driven through the DevTools protocol with real mouse and key events, the clipboard, emulated light and dark themes and screenshots, and checked by reading the result (the scripts were throwaway and are not in the repository; `CLAUDE.md` says how to write one).
+- The promise that no data leaves the computer was checked in Chrome from `file://` and from a server: a full session makes no request but the page's own, and attempts to fetch, post, open a socket, send a beacon, load an image, frame a page, evaluate text or inject a script are refused by the policy; a control page without the policy did send the beacon.
 
 ## Sources
 
