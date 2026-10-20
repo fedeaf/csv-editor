@@ -1,4 +1,4 @@
-import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, sequence, setCell, setHeaders, sortRows, type Command } from './model/commands'
+import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, sequence, setCell, setHeaders, sortRows, writeCells, type Command } from './model/commands'
 import { parseTsv, squared, toTsv } from './model/clipboard'
 import { blankDocument, copyName, encodeDocumentAsync, loadDocument, untitledName, type CsvDocument } from './document'
 import { hasFiles, openCsv, readDropped, readSource, saveCsv, saveCsvAs } from './files'
@@ -11,6 +11,7 @@ import { TableView, uniqueValues, type ColumnFilter } from './model/view'
 import { closeContextMenu, showContextMenu, type MenuItem } from './ui/contextMenu'
 import { closeFilterDropdown, showFilterDropdown, type FilterEntry } from './ui/filterDropdown'
 import { DEFAULT_COLUMN_WIDTH } from './ui/columns'
+import { fillCopies } from './ui/rects'
 import { Grid, type FillRequest, type GridHandlers, type GridModel, type GridState, type Rect } from './ui/grid'
 import { confirmDialog, formatDialog, isDialogOpen, messageDialog, saveOrDiscardDialog } from './ui/dialog'
 import { createSearchPanel } from './ui/searchPanel'
@@ -614,25 +615,22 @@ function redo(): void {
 
 // --- fill (REL-01 to REL-05) ---------------------------------------------------------------
 
-/** Copies the source cell's value into the covered cells. Only rows shown are covered (D-08). */
-function fill({ row, col, toRow, toCol }: FillRequest): void {
+/**
+ * Copies the source block over the rest of the target, repeating it as a pattern: one cell copies its value, a row of
+ * cells copies each value down its column. Only rows shown are covered (D-08).
+ */
+function fill({ source, target }: FillRequest): void {
   if (!current) return
   const { view } = current
   const { table } = current.doc
-  const sourceId = view.idAt(row)
-  if (sourceId === undefined) return
-  const value = table.rowById(sourceId)!.cells[col]!
-  const targets: { rowId: number; col: number }[] = []
-  if (toCol === col) {
-    for (let r = Math.min(row, toRow); r <= Math.max(row, toRow); r++) {
-      if (r !== row) targets.push({ rowId: view.idAt(r)!, col })
-    }
-  } else {
-    for (let c = Math.min(col, toCol); c <= Math.max(col, toCol); c++) {
-      if (c !== col) targets.push({ rowId: sourceId, col: c })
-    }
+  const cells: { rowId: number; col: number; value: string }[] = []
+  for (const c of fillCopies(source, target)) {
+    const rowId = view.idAt(c.row)
+    const fromId = view.idAt(c.fromRow)
+    if (rowId === undefined || fromId === undefined) continue
+    cells.push({ rowId, col: c.col, value: table.rowById(fromId)!.cells[c.fromCol]! })
   }
-  const command = fillCells(table, targets, value)
+  const command = writeCells(table, cells)
   if (command) run(command)
 }
 

@@ -215,16 +215,24 @@ export function sortRows(table: Table, col: number, dir: SortDirection): Command
  * alone; returns undefined if nothing would change.
  */
 export function fillCells(table: Table, targets: { rowId: number; col: number }[], value: string, label = 'Fill'): Command | undefined {
-  const changes = targets
-    .map((t) => ({ ...t, before: table.rowById(t.rowId)!.cells[t.col]! }))
-    .filter((c) => c.before !== value)
+  return writeCells(table, targets.map((t) => ({ ...t, value })), label)
+}
+
+/**
+ * Writes its own value into each cell as a single step: a fill from a block of several cells. Cells already
+ * holding their value are left alone; returns undefined if nothing would change.
+ */
+export function writeCells(table: Table, cells: { rowId: number; col: number; value: string }[], label = 'Fill'): Command | undefined {
+  const changes = cells
+    .map((c) => ({ ...c, before: table.rowById(c.rowId)!.cells[c.col]! }))
+    .filter((c) => c.before !== c.value)
   if (changes.length === 0) return undefined
   const columns = [...new Set(changes.map((c) => table.colIds[c.col]!))]
   return {
     label,
     invalidates: columns,
     run: (t) => {
-      for (const c of changes) t.rowById(c.rowId)!.cells[c.col] = value
+      for (const c of changes) t.rowById(c.rowId)!.cells[c.col] = c.value
     },
     revert: (t) => {
       for (const c of changes) t.rowById(c.rowId)!.cells[c.col] = c.before

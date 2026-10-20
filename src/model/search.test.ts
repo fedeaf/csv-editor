@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fillCells, replaceCells, setCell } from './commands'
+import { fillCells, replaceCells, setCell, writeCells } from './commands'
 import { History } from './history'
 import { createMatcher, findAllMatches, findMatch, findReplacements, matchNumber, patternError, type SearchGrid } from './search'
 import { Table } from './table'
@@ -116,6 +116,21 @@ describe('fillCells', () => {
     const cmd = fillCells(t, [{ rowId: t.order[1]!, col: 2 }], 'x')!
     expect(cmd.invalidates).toEqual([t.colIds[2]])
     expect(setCell(t, t.order[0]!, 0, 'z').invalidates).toEqual([t.colIds[0]])
+  })
+})
+
+describe('writeCells', () => {
+  it('writes each cell its own value as one undo step, leaving cells that already hold it', () => {
+    const t = new Table(['a', 'b'], [['1', '2'], ['3', '4']])
+    const h = new History()
+    const r = t.order[1]!
+    const cmd = writeCells(t, [{ rowId: r, col: 0, value: '1' }, { rowId: r, col: 1, value: '4' }])!
+    expect(cmd.invalidates).toEqual([t.colIds[0]]) // column b did not change
+    h.execute(cmd, t)
+    expect(t.rowAt(1)!.cells).toEqual(['1', '4'])
+    h.undo(t)
+    expect(t.rowAt(1)!.cells).toEqual(['3', '4'])
+    expect(h.canUndo).toBe(false)
   })
 })
 

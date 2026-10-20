@@ -5,6 +5,8 @@ import type { Rect } from './grid'
 
 export const rectContains = (r: Rect, row: number, col: number): boolean => row >= r.r0 && row <= r.r1 && col >= r.c0 && col <= r.c1
 
+export const sameRect = (a: Rect, b: Rect): boolean => a.r0 === b.r0 && a.r1 === b.r1 && a.c0 === b.c0 && a.c1 === b.c1
+
 export const rectCells = (r: Rect): number => (r.r1 - r.r0 + 1) * (r.c1 - r.c0 + 1)
 
 /** What is left of `a` once `b` is taken out of it: up to four rectangles that do not overlap, or `a` itself. */
@@ -57,4 +59,32 @@ export function joinParts(rects: Rect[], lastRow: number, lastCol: number): Rect
     ...cols.map(([c0, c1]): Rect => ({ r0: 0, r1: lastRow, c0, c1 })),
     ...joinTouching(rects.filter((r) => !wholeRow(r) && !wholeCol(r))),
   ]
+}
+
+/** A cell to fill and the cell of the source block it copies. */
+export interface FillCopy {
+  row: number
+  col: number
+  fromRow: number
+  fromCol: number
+}
+
+/**
+ * Filling `target`, a block that holds `source` and runs past it on one side: every cell outside the source, with the
+ * source cell it takes its value from. The source repeats as a pattern, so one row of cells copies each value down its
+ * column, and two cells "a" and "b" give a, b, a, b. Going up or left, the cell next to the source copies its nearest
+ * edge.
+ */
+export function fillCopies(source: Rect, target: Rect): FillCopy[] {
+  const height = source.r1 - source.r0 + 1
+  const width = source.c1 - source.c0 + 1
+  const wrap = (n: number, size: number) => ((n % size) + size) % size
+  const out: FillCopy[] = []
+  for (let row = target.r0; row <= target.r1; row++) {
+    for (let col = target.c0; col <= target.c1; col++) {
+      if (rectContains(source, row, col)) continue
+      out.push({ row, col, fromRow: source.r0 + wrap(row - source.r0, height), fromCol: source.c0 + wrap(col - source.c0, width) })
+    }
+  }
+  return out
 }

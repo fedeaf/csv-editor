@@ -1,6 +1,6 @@
 import { clampWidth, columnAt, columnOffsets, fitWidth, longestStrings } from './columns'
 import { editorSpan } from './editorSpan'
-import { joinParts, rectContains, subtractRect } from './rects'
+import { joinParts, rectContains, sameRect, subtractRect } from './rects'
 
 const ROW_HEIGHT = 26
 const HEADER_HEIGHT = 28
@@ -40,12 +40,10 @@ export interface ColumnInfo {
   errorExamples: string[]
 }
 
-/** A fill from the cell (row, col) to (toRow, toCol): the same row or the same column. */
+/** A fill from a block of cells over a larger one that holds it, grown along rows or along columns only. */
 export interface FillRequest {
-  row: number
-  col: number
-  toRow: number
-  toCol: number
+  source: Rect
+  target: Rect
 }
 
 /** A block of cells, inclusive on all sides, in display rows and columns. */
@@ -141,9 +139,8 @@ export class Grid {
   private measureContext: CanvasRenderingContext2D | undefined
   private fillPreview: HTMLElement
   private drag: {
-    row: number
-    col: number
-    target: { row: number; col: number }
+    source: Rect
+    target: Rect
     /** Pointer position in the viewport, and where the drag began in grid coordinates. */
     x: number
     y: number
@@ -163,7 +160,7 @@ export class Grid {
     this.header = el('div', 'grid-header')
     this.body = el('div', 'grid-body')
     this.fillHandle = el('div', 'fill-handle')
-    this.fillHandle.title = 'Drag to copy the value. Double-click to copy it down the column.'
+    this.fillHandle.title = 'Drag to copy the selected values. Double-click to copy them down to the last row.'
     this.fillPreview = el('div', 'fill-preview')
     this.fillHandle.hidden = this.fillPreview.hidden = true
     this.body.append(this.fillHandle, this.fillPreview)
@@ -946,31 +943,34 @@ export class Grid {
 
   // --- fill handle (REL-01 to REL-03) -------------------------------------------------------
 
-  /** The handle sits on the bottom-right corner of the active cell, when it is the only one selected. */
+  /**
+   * The handle sits on the bottom-right corner of the selection, when it is one block of cells: not whole rows or
+   * columns, nor parts chosen apart with Ctrl.
+   */
   private placeFillHandle(): void {
     const model = this.model
-    const single = !this.band && this.others.length === 0 && (!this.extent || (this.extent.row === this.active.row && this.extent.col === this.active.col))
-    const show = !!model && model.rowCount > 0 && model.headers.length > 0 && !this.editing && single
+    const show = !!model && model.rowCount > 0 && model.headers.length > 0 && !this.editing && !this.band && this.others.length === 0
     this.fillHandle.hidden = !show
     if (!show) return
-    this.fillHandle.style.left = `${this.colLeft(this.active.col) + this.colWidth(this.active.col) - 6}px`
-    this.fillHandle.style.top = `${(this.active.row + 1) * ROW_HEIGHT - 6}px`
+    const { r1, c1 } = this.selection()
+    this.fillHandle.style.left = `${this.colLeft(c1) + this.colWidth(c1) - 6}px`
+    this.fillHandle.style.top = `${(r1 + 1) * ROW_HEIGHT - 6}px`
   }
 
-  /** Double-click: copy the value down to the last row shown (REL-03). */
+  /** Double-click: copy the selected cells down their columns to the last row shown (REL-03). */
   private fillDown(): void {
     const model = this.model
-    const { row, col } = this.active
-    if (model && row < model.rowCount - 1) this.handlers.onFill({ row, col, toRow: model.rowCount - 1, toCol: col })
+    const source = this.selection()
+    if (model && source.r1 < model.rowCount - 1) this.handlers.onFill({ source, target: { ...source, r1: model.rowCount - 1 } })
   }
 
   private startFill(e: MouseEvent): void {
     e.preventDefault()
-    const { row, col } = this.active
+    const source = this.selection()
     const box = this.scroller.getBoundingClientRect()
     const originX = e.clientX - box.left + this.scroller.scrollLeft
     const originY = e.clientY - box.top + this.scroller.scrollTop
-    this.drag = { row, col, target: { row, col }, x: e.clientX, y: e.clientY, originX, originY, moved: false, frame: 0 }
+    this.drag = { source, target: source, x: e.clientX, y: e.clientY, originX, originY, moved: false, frame: 0 }
     document.body.classList.add('filling')
     document.addEventListener('mousemove', this.onDragMove)
     document.addEventListener('mouseup', this.onDragEnd)
@@ -1028,15 +1028,16 @@ export class Grid {
 
     const col = columnAt(this.offsets, d.x - box.left + s.scrollLeft - ROW_NUMBER_WIDTH)
     const row = clamp(Math.floor((d.y - box.top + s.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT), model.rowCount - 1)
-    d.target = horizontal ? { row: d.row, col } : { row, col: d.col }
+    // The source grows towards the pointer, along one axis; with the pointer over the source it stays as it is.
+    const s0 = d.source
+    d.target = horizontal
+      ? { ...s0, c0: Math.min(s0.c0, col), c1: Math.max(s0.c1, col) }
+      : { ...s0, r0: Math.min(s0.r0, row), r1: Math.max(s0.r1, row) }
 
-    const same = d.target.row === d.row && d.target.col === d.col
+    const same = sameRect(d.target, s0)
     this.fillPreview.hidden = same
     if (!same) {
-      const r0 = Math.min(d.row, d.target.row)
-      const r1 = Math.max(d.row, d.target.row)
-      const c0 = Math.min(d.col, d.target.col)
-      const c1 = Math.max(d.col, d.target.col)
+      const { r0, r1, c0, c1 } = d.target
       Object.assign(this.fillPreview.style, {
         top: `${r0 * ROW_HEIGHT}px`,
         height: `${(r1 - r0 + 1) * ROW_HEIGHT}px`,
@@ -1058,8 +1059,7 @@ export class Grid {
     document.removeEventListener('keydown', this.onDragKey)
     this.fillPreview.hidden = true
     this.focus()
-    const moved = d.target.row !== d.row || d.target.col !== d.col
-    if (apply && moved) this.handlers.onFill({ row: d.row, col: d.col, toRow: d.target.row, toCol: d.target.col })
+    if (apply && !sameRect(d.target, d.source)) this.handlers.onFill({ source: d.source, target: d.target })
   }
 
   /** Whether the whole row or column is selected (as a run of its own or as part of one). */

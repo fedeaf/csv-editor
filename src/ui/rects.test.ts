@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Rect } from './grid'
-import { joinParts, rectCells, rectContains, subtractRect } from './rects'
+import { fillCopies, joinParts, rectCells, rectContains, subtractRect } from './rects'
 
 const R = (r0: number, r1: number, c0: number, c1: number): Rect => ({ r0, r1, c0, c1 })
 const cellsOf = (rects: Rect[]) => new Set(rects.flatMap((r) => Array.from({ length: rectCells(r) }, (_, i) => `${r.r0 + Math.floor(i / (r.c1 - r.c0 + 1))},${r.c0 + (i % (r.c1 - r.c0 + 1))}`)))
@@ -51,5 +51,39 @@ describe('rectContains', () => {
   it('is true on the edges and false just outside', () => {
     expect(rectContains(R(1, 3, 1, 3), 1, 3)).toBe(true)
     expect(rectContains(R(1, 3, 1, 3), 4, 2)).toBe(false)
+  })
+})
+
+describe('fillCopies', () => {
+  const source = (c: { fromRow: number; fromCol: number }) => `${c.fromRow},${c.fromCol}`
+
+  it('copies one cell over the cells covered', () => {
+    const copies = fillCopies({ r0: 2, r1: 2, c0: 1, c1: 1 }, { r0: 2, r1: 4, c0: 1, c1: 1 })
+    expect(copies.map((c) => c.row)).toEqual([3, 4])
+    expect(copies.map(source)).toEqual(['2,1', '2,1'])
+  })
+
+  it('copies each cell of a row down its own column', () => {
+    const copies = fillCopies({ r0: 0, r1: 0, c0: 0, c1: 2 }, { r0: 0, r1: 1, c0: 0, c1: 2 })
+    expect(copies.map((c) => `${c.row},${c.col}<-${source(c)}`)).toEqual(['1,0<-0,0', '1,1<-0,1', '1,2<-0,2'])
+  })
+
+  it('repeats a block of several rows as a pattern', () => {
+    const copies = fillCopies({ r0: 0, r1: 1, c0: 0, c1: 0 }, { r0: 0, r1: 4, c0: 0, c1: 0 })
+    expect(copies.map((c) => c.fromRow)).toEqual([0, 1, 0])
+  })
+
+  it('going up, the row just above copies the last row of the block', () => {
+    const copies = fillCopies({ r0: 3, r1: 4, c0: 0, c1: 0 }, { r0: 0, r1: 4, c0: 0, c1: 0 })
+    expect(copies.map((c) => `${c.row}<-${c.fromRow}`)).toEqual(['0<-4', '1<-3', '2<-4'])
+  })
+
+  it('repeats columns when filling to the left', () => {
+    const copies = fillCopies({ r0: 0, r1: 0, c0: 2, c1: 3 }, { r0: 0, r1: 0, c0: 0, c1: 3 })
+    expect(copies.map((c) => `${c.col}<-${c.fromCol}`)).toEqual(['0<-2', '1<-3'])
+  })
+
+  it('has nothing to copy when the target is the source', () => {
+    expect(fillCopies({ r0: 0, r1: 1, c0: 0, c1: 1 }, { r0: 0, r1: 1, c0: 0, c1: 1 })).toEqual([])
   })
 })
