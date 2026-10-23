@@ -23,7 +23,7 @@ export interface ColumnStat {
 
 /**
  * Duplicate statistics per column, computed lazily and cached by column id.
- * Duplicates follow D-05: exact equality, case and whitespace sensitive, blanks never count.
+ * Duplicates need exact equality, case and whitespace sensitive, blanks never count.
  * They are always measured over every row, whatever other filters are active.
  */
 const MAX_ERROR_EXAMPLES = 3

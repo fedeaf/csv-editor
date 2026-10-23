@@ -886,7 +886,7 @@ export class Grid {
     node.classList.toggle('filtered', info.filtered)
     const text = el('span', 'header-text')
     text.textContent = name
-    text.title = name
+    text.title = `${col + 1}. ${name}` // the tooltip only; the header itself, and Copy header, stay as they are
     // A warning ahead of the name, only while the column holds a spreadsheet error. Clicking it walks
     // through those cells.
     let warning: HTMLElement | undefined

@@ -617,7 +617,7 @@ function redo(): void {
 
 /**
  * Copies the source block over the rest of the target, repeating it as a pattern: one cell copies its value, a row of
- * cells copies each value down its column. Only rows shown are covered (D-08).
+ * cells copies each value down its column. Only rows shown are covered.
  */
 function fill({ source, target }: FillRequest): void {
   if (!current) return
@@ -1206,7 +1206,7 @@ menuList.addEventListener('click', (e) => {
 })
 
 /**
- * Insert and delete live in the context menu of row numbers and column headers (D-09), and the menu of
+ * Insert and delete live in the context menu of row numbers and column headers, and the menu of
  * a cell has them too, together with cut, copy, paste and clear. They all act on what is selected.
  */
 /** Cut, copy, paste and clear, acting on the cells selected (a block, or the whole of the rows or columns chosen). */

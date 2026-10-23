@@ -37,7 +37,7 @@ undo, redo and Find only act on the tab in focus.
 | **Spreadsheet errors and scientific notation** | A red warning ahead of a header's name appears while the column holds a cell that is a spreadsheet error, or a number that Excel turned into scientific notation (`1.23457E+15`, `4.5E-07`, `1,5E+10`; the exponent must carry its sign, as spreadsheets write it, so `1e5` is left alone). Spreadsheet errors are: `#N/A`, `#DIV/0!`, `#VALUE!`, `#REF!`, `#NAME?`, `#NUM!`, `#NULL!`, `#SPILL!`, `#CALC!` and the other Excel ones, `#ERROR!` from Google Sheets, Excel's Spanish versions (`#¡DIV/0!`, `#N/D`, `#¿NOMBRE?`…) and LibreOffice's `Err:502`-style codes. The whole cell must be the error; case and surrounding spaces are ignored. Text such as `N/A`, `NaN` or `null` does not count. The tooltip says how many cells and which errors. Click the warning to go to the first of them, click again for the next, and so on; after the last it starts over. The count covers the whole column, whatever a filter hides, but only rows shown are visited. The warning goes away when the last error is fixed. |
 | **Find and replace** | `Ctrl+F` opens a floating panel. Drag it by the dotted strip on its left, or by any part of it that is not a control, to put it where it does not cover what you are reading; it stays inside the table's area, and double-clicking the strip puts it back in the corner. Case-insensitive, partial match by default, with an *entire cell* option and a *Regex* option that reads the text as a regular expression (JavaScript syntax; `.` also crosses the line breaks of a cell; with *entire cell* the pattern must match the whole cell). An invalid pattern is reported in the panel instead of searching. While the panel is open, every cell that matches is marked in the table (pale yellow, and orange for the one selected), in the document in focus; the marks follow edits, filters and scrolling, and go when the panel is closed. The message ("3 of 12", "No matches") sits inside the text field, which turns red when nothing is found or the pattern is not valid. It searches the rows shown, row by row, and wraps around, and the panel says which match you are on ("3 of 12", counting cells that match; the tooltip adds the row and column). A second row of the same panel is for replacing: **Replace** changes the selected match (every occurrence in that cell) and moves to the next one, and **Replace all** changes every match in the rows shown as one undo step. With *Regex* on, the replacement can use `$1`, `$&` and `$<name>` for what the pattern matched (`$$` is a dollar sign); otherwise it is taken literally. There is no separate shortcut for it. |
 | **Fill** | Drag the handle at the corner of the selected cell or block of cells, or double-click it to copy down to the last row. A block repeats as a pattern: a row of cells copies each value down its own column, and two cells `a`, `b` give `a`, `b`, `a`, `b`. Values are copied as they are, with no series. With a filter active, only the rows shown change. |
-| **Columns** | Drag the right edge of a header to resize its column, or double-click the edge to fit the column to its longest cells and its header. Widths are kept per document and are not saved in the file. |
+| **Columns** | Drag the right edge of a header to resize its column, or double-click the edge to fit the column to its longest cells and its header. Widths are kept per document and are not saved in the file. Hovering a header's name shows its column number and the full name ("23. Name"); the header itself, and Copy header, are not changed. |
 | **Theme** | A light and a dark look. The page opens with the system's setting; **Menu ▸ Dark Mode** switches it for as long as the page stays open. The choice is not saved anywhere: the next visit starts from the system again. |
 | **Status bar** | The left side shows the size of the selection ("Selected 3 rows × 2 columns (6 cells)") followed by what the cells hold, each figure as a small coloured label (green for "No blanks" and "No duplicates", amber for blanks, nulls and duplicates, grey for the unique count): how many are blank (empty or only spaces), how many are a null (text such as `null`, `NaN`, `N/A`, `none`), or "No blanks", how many different values there are ("9 unique"), and the duplicates: how many of them repeat and in how many cells ("2 duplicate values (4 cells)"), or "No duplicates". Duplicates are exact matches, sensitive to case and spaces, with blanks never counting, and all the cells selected are compared with each other. No cell is ever read as a number. Hover it for the full count. Only the rows shown are counted, and a very large selection is counted in the background, so the figures can arrive a moment after the selection or, for a few seconds, the result of the last action ("✓ Saved", "✓ Pasted"). The right side describes the file: rows, columns, encoding and delimiter, and how many rows a filter leaves visible. |
 | **Selection** | With a single cell selected, its row is tinted faintly, to find it again at a glance; the tint goes away when a block, row or column is selected. Select blocks by dragging, or with `Shift` and the arrows. Click a row number or a header to select the whole row or column (`Shift` extends the part, and `Ctrl` adds another one, so rows, columns or even single cells that are not next to each other can be selected together, as in Excel; `Ctrl`+click on one that is already selected takes it out; Copy puts parts that line up in one text, rows one under another or columns one beside another, and says so when they do not line up), or the corner cell above the row numbers to select everything (`Ctrl+A` does the same). |
@@ -83,7 +83,6 @@ npm install
 npm run dev       # development server at http://localhost:5173
 npm run build     # type-checks, then writes the single file to dist/index.html
 npm test          # unit tests
-npm run samples   # writes test CSVs into samples/ (encodings, delimiters, a 200,000-row file)
 ```
 
 `dist/index.html` is committed, so run `npm run build` before committing a change to the source.
@@ -107,7 +106,6 @@ src/
   ui/                  grid (selection, editing, fill), tab bar, split divider, filter dropdown, find panel,
                        dialogs, context menu, status bar texts, and small pure helpers (intervals, rects, columns)
 THIRD_PARTY_NOTICES.md Papa Parse's license; LICENSE is the AGPL
-CLAUDE.md              notes for whoever continues the work (conventions, how to verify, ideas not done yet)
 ```
 
 How it holds together:
@@ -139,15 +137,12 @@ top of the built `dist/index.html` and in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_N
 
 ## Status and limits
 
-All seven milestones of [the specification](CSV%20Editor%20MVP%20Specification.md) are done, and its
-decisions D-01 to D-09 are closed there, each with what the editor does. On top of the original scope
-there is a long list of features (tabs and split view, multi-part selection, copy and paste, Find and Replace
-with regular expressions, file format choices, a summary of the selection, and more): the specification lists them
-under *Beyond the original scope*.
+The feature table above is the full list of what the editor does: tabs and split view, multi-part selection,
+copy and paste, Find and Replace with regular expressions, file format choices, a summary of the selection, and more.
 
 The look comes from one palette, defined as named values at the top of
-[`src/style.css`](src/style.css), with each colour written once for both themes, and described in the
-specification under *Design*. A test keeps the text readable in both themes (WCAG contrast ratios).
+[`src/style.css`](src/style.css), with each colour written once for both themes. A test keeps the text
+readable in both themes (WCAG contrast ratios).
 
 Known limits:
 
@@ -163,7 +158,6 @@ Known limits:
   you type a character that encoding cannot represent, the editor asks before saving as UTF-8.
 - The unit tests cover the model, the CSV handling, the clipboard format, the status-bar texts and a combined
   scenario (filter, sort, search, fill, edit, paste, undo, save and reopen a Windows-1252 file). The interface
-  has no automated tests; each feature was run in real Chrome and checked, as the specification's *Verification*
-  section describes.
+  has no automated tests; each feature was run in real Chrome and checked by hand.
 - Ctrl+click can take a selected part out of the selection, but the last part always stays; a selection in several
   parts cannot be copied unless its parts line up (rows under rows, columns beside columns), as in Excel.

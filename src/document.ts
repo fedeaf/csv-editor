@@ -119,7 +119,7 @@ export interface Encoded {
 }
 
 /**
- * Bytes to write, in the original encoding (D-03). If the text has characters that
+ * Bytes to write, in the original encoding. If the text has characters that
  * encoding cannot hold, `confirmUtf8` decides whether to switch to UTF-8; returns
  * undefined if the user declines. The caller adopts `format` once the write succeeds.
  */

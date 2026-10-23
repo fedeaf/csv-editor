@@ -140,7 +140,7 @@ describe('round trip (open, save unedited, reopen)', () => {
   })
 })
 
-describe('saving with unencodable characters (D-03)', () => {
+describe('saving with unencodable characters', () => {
   it('asks, and switches to UTF-8 only when accepted', () => {
     const doc = loadDocument('t.csv', bytes(0x61, 0x0a, 0xe9, 0x0a)) // Windows-1252 "a\né\n"
     doc.table.rowAt(0)!.cells[0] = '😀'

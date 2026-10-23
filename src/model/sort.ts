@@ -1,6 +1,6 @@
 import type { SortDirection, Table } from './table'
 
-// English collation, case-insensitive (D-04). Digits are plain text, so "10" sorts before "9".
+// English collation, case-insensitive. Digits are plain text, so "10" sorts before "9".
 const collator = new Intl.Collator('en', { sensitivity: 'accent' })
 
 /**

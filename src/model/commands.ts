@@ -187,7 +187,7 @@ export function sequence(label: string, commands: Command[]): Command {
 }
 
 /**
- * Sorts all rows by a column (ORD-02: there is no single-column sort). Returns undefined when
+ * Sorts all rows by a column. Returns undefined when
  * the order would not change. The new order is stored so redo is exact.
  */
 export function sortRows(table: Table, col: number, dir: SortDirection): Command | undefined {

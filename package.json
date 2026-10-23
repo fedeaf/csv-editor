@@ -10,8 +10,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "samples": "node scripts/gen-samples.mjs"
+    "test": "vitest run"
   },
   "dependencies": {
     "papaparse": "^5.7.0"

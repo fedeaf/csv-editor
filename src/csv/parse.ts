@@ -4,7 +4,7 @@ export type Delimiter = ',' | ';' | '\t' | '|'
 export type LineEnding = '\n' | '\r\n'
 
 export interface ParsedCsv {
-  /** First CSV row (D-01). */
+  /** First CSV row. */
   headers: string[]
   rows: string[][]
   delimiter: Delimiter
@@ -18,7 +18,7 @@ export interface ParsedCsv {
 
 const CANDIDATES: Delimiter[] = [',', ';']
 
-/** Comma or semicolon (D-02); tab and pipe can only be chosen by hand: the one that gives the most consistent multi-column rows. */
+/** Comma or semicolon; tab and pipe can only be chosen by hand: the one that gives the most consistent multi-column rows. */
 export function detectDelimiter(text: string): Delimiter {
   let best: Delimiter = ','
   let bestScore = 0

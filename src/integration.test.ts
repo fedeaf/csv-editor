@@ -1,4 +1,4 @@
-// H7: one session that combines the features, then saves and reopens the file. The file that comes
+// One session that combines the features, then saves and reopens the file. The file that comes
 // back must hold exactly what is expected, whatever order the operations ran in.
 import { describe, expect, it } from 'vitest'
 import { encodeDocument, loadDocument } from './document'

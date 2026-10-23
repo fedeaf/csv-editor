@@ -29,7 +29,7 @@ describe('sorting', () => {
     expect(col(table, 1)).toEqual(['5', '1', '7', '2', '4', '3', '6'])
   })
 
-  it('treats numbers as text: "10" sorts before "9" (D-04)', () => {
+  it('treats numbers as text: "10" sorts before "9"', () => {
     const { table, history } = setup([['9'], ['10'], ['2']], ['n'])
     history.execute(sortRows(table, 0, 'asc')!, table)
     expect(col(table, 0)).toEqual(['10', '2', '9'])
@@ -75,7 +75,7 @@ describe('sorting', () => {
   })
 })
 
-describe('duplicate statistics (D-05)', () => {
+describe('duplicate statistics', () => {
   it('counts exact repeats only: case and spaces matter, blanks never count', () => {
     const { view, table } = setup([['a'], ['a'], ['A'], ['a '], [''], [''], ['b']], ['k'])
     const stat = view.stats.get(table.colIds[0]!)

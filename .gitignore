@@ -1,2 +1,8 @@
 node_modules
 samples
+
+# Development material, kept out of the repository
+.claude
+CLAUDE.md
+CSV Editor MVP Specification.md
+scripts
