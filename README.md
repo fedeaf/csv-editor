@@ -7,6 +7,9 @@ always act on whole rows.
 It ships as **one self-contained HTML file**, [`dist/index.html`](dist/index.html). Open it in
 Chrome by double-clicking it. No server, no install, nothing to download.
 
+It is also published at **<https://fedeaf.github.io/csv-editor/>**, the same file served by GitHub Pages. The page is
+downloaded once from there; after that it behaves exactly like the local file and makes no request of its own.
+
 > **Your data never leaves the computer.** The page makes no network request of any kind, and the built file
 > carries a Content-Security-Policy that makes the browser refuse one: no fetch, XHR, WebSocket, beacon, frame, worker,
 > font or remote image, and no script or style other than the two blocks of the file itself (allowed by their hash).
@@ -85,7 +88,9 @@ npm run build     # type-checks, then writes the single file to dist/index.html
 npm test          # unit tests
 ```
 
-`dist/index.html` is committed, so run `npm run build` before committing a change to the source.
+`dist/index.html` is committed, so run `npm run build` before committing a change to the source. A push to `main`
+that changes `dist/` publishes it to GitHub Pages ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)); the
+workflow builds nothing, it serves the committed file.
 
 In development, `window.__app` exposes a small test hook (load a file, read the active document and
 history, switch and close tabs). It is not part of the production build.
