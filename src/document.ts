@@ -8,6 +8,8 @@ export interface CsvDocument {
   table: Table
   format: FileFormat
   handle?: FileSystemFileHandle
+  /** For a copy, the original's file. It is never written to: its folder is only where Save As starts. */
+  saveNextTo?: FileSystemFileHandle
   /** The columns (by id) whose header the file wrote between quotes. */
   quotedHeaders: Set<number>
   /** The bytes read, kept only when there is no file handle to read them from again. */

@@ -86,7 +86,7 @@ export async function saveCsv(doc: CsvDocument, bytes: Uint8Array): Promise<bool
 
 export async function saveCsvAs(doc: CsvDocument, bytes: Uint8Array): Promise<boolean> {
   try {
-    const handle = await window.showSaveFilePicker({ suggestedName: doc.name, types: CSV_TYPES })
+    const handle = await window.showSaveFilePicker({ suggestedName: doc.name, types: CSV_TYPES, startIn: doc.handle ?? doc.saveNextTo })
     await write(handle, bytes)
     doc.handle = handle
     doc.name = handle.name

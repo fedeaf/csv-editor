@@ -420,10 +420,10 @@ function wantsCopy(doc: CsvDocument): Promise<boolean> {
   })
 }
 
-/** The same content as its own document: no file behind it, and a name that tells it from the original. */
+/** The same content as its own document: no file behind it, and a name that tells it from the original. Save As starts in the original's folder. */
 async function detachedCopy(doc: CsvDocument): Promise<CsvDocument> {
   const source = await readSource(doc)
-  return { ...doc, handle: undefined, source, name: copyName(doc.name, tabs.map((t) => t.doc.name)) }
+  return { ...doc, handle: undefined, saveNextTo: doc.handle, source, name: copyName(doc.name, tabs.map((t) => t.doc.name)) }
 }
 
 /** The tab already showing this file, recognised by its file handle (the same file can have another name). */
@@ -1144,7 +1144,7 @@ async function chooseFormat(): Promise<void> {
     })
     if (!discard || !tabs.includes(tab)) return
   }
-  const doc = loadDocument(tab.doc.name, await readSource(tab.doc), tab.doc.handle, answer.format)
+  const doc = { ...loadDocument(tab.doc.name, await readSource(tab.doc), tab.doc.handle, answer.format), saveNextTo: tab.doc.saveNextTo }
   if (!tabs.includes(tab)) return
   Object.assign(tab, { doc, view: new TableView(doc.table), history: new History(), lastMatch: undefined, lastError: undefined, matches: undefined })
   tab.version++
