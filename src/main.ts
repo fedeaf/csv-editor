@@ -1,7 +1,7 @@
 import { changeFormat, deleteColumns, deleteRows, fillCells, insertColumn, insertRows, pasteCells, renameHeader, replaceCells, sequence, setCell, setHeaders, sortRows, writeCells, type Command } from './model/commands'
 import { parseTsv, squared, toTsv } from './model/clipboard'
-import { blankDocument, copyName, encodeDocumentAsync, loadDocument, untitledName, type CsvDocument } from './document'
-import { hasFiles, openCsv, readDropped, readSource, saveCsv, saveCsvAs } from './files'
+import { blankDocument, copyName, encodeDocumentAsync, exportDocument, loadDocument, untitledName, type CsvDocument } from './document'
+import { exportXlsx, hasFiles, openCsv, readDropped, readSource, saveCsv, saveCsvAs } from './files'
 import { DELIMITER_NAMES, encodingLabel } from './model/formatOptions'
 import { History, type Outcome } from './model/history'
 import type { FileFormat } from './model/table'
@@ -561,6 +561,7 @@ function showMeta(message?: string, neutral = false): void {
   item('redo').classList.toggle('disabled', !tab?.history.canRedo)
   item('save').classList.toggle('disabled', !tab)
   item('save-as').classList.toggle('disabled', !tab)
+  item('export-xlsx').classList.toggle('disabled', !tab)
   item('format').classList.toggle('disabled', !tab)
   item('find').classList.toggle('disabled', !tab)
   item('clear-filters').classList.toggle('disabled', !tab?.view.filtered)
@@ -1114,6 +1115,15 @@ async function saveTab(tab: Tab, as: boolean): Promise<boolean> {
   return true
 }
 
+/** Writes a copy of the tab in focus as xlsx. The tab stays as it was: same file, same name, and unsaved changes still unsaved. */
+async function exportTab(): Promise<void> {
+  const tab = current
+  if (!tab) return
+  grid.commitEdit()
+  const name = await exportXlsx(tab.doc, () => exportDocument(tab.doc))
+  if (name) showMeta(tab === current ? `Exported ${name}` : undefined)
+}
+
 /** True when two formats write a document the same way. */
 const sameFormat = (a: FileFormat, b: FileFormat) =>
   a.encoding === b.encoding && a.bom === b.bom && a.delimiter === b.delimiter && a.lineEnding === b.lineEnding && a.quoteAll === b.quoteAll
@@ -1163,6 +1173,7 @@ const actions: Record<string, () => void | Promise<void>> = {
   open,
   save: () => save(false),
   'save-as': () => save(true),
+  'export-xlsx': exportTab,
   format: chooseFormat,
   undo,
   redo,

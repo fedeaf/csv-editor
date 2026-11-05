@@ -1,9 +1,35 @@
 import { describe, expect, it } from 'vitest'
 import { Table } from './model/table'
-import { copyName, BLANK_COLUMNS, BLANK_ROWS, blankDocument, encodeDocumentAsync, loadDocument, serializeDocument, untitledName } from './document'
+import { copyName, BLANK_COLUMNS, BLANK_ROWS, blankDocument, encodeDocumentAsync, exportDocument, loadDocument, serializeDocument, untitledName, xlsxName } from './document'
 
 const latin1 = (text: string) => new Uint8Array(Buffer.from(text, 'latin1'))
 const windows1252 = () => loadDocument('t.csv', latin1('a,b\n1,\xe9\n')) // "1,é" in Windows-1252
+
+describe('xlsxName', () => {
+  it('changes the extension, or adds it to a name without one', () => {
+    expect(xlsxName('report.csv')).toBe('report.xlsx')
+    expect(xlsxName('Untitled 2.csv')).toBe('Untitled 2.xlsx')
+    expect(xlsxName('a.b.TXT')).toBe('a.b.xlsx')
+    expect(xlsxName('notes')).toBe('notes.xlsx')
+    expect(xlsxName('.hidden')).toBe('.hidden.xlsx')
+  })
+})
+
+describe('exportDocument', () => {
+  it('leaves the document as it was: its format, its name and its cells', async () => {
+    const doc = windows1252()
+    const before = { ...doc.format }
+    await exportDocument(doc)
+    expect(doc.format).toEqual(before)
+    expect(doc.name).toBe('t.csv')
+    expect(serializeDocument(doc)).toBe('a,b\n1,é\n')
+  })
+
+  it('makes a small file of a blank document: only what has content is written', async () => {
+    const blob = await exportDocument(blankDocument('Untitled.csv'))
+    expect(blob.size).toBeLessThan(2000)
+  })
+})
 
 describe('encodeDocumentAsync', () => {
   it('does not ask when everything fits the original encoding', async () => {

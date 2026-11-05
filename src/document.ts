@@ -2,6 +2,7 @@ import { decode, detectEncoding, encode, unencodableChars } from './csv/encoding
 import { parseCsv } from './csv/parse'
 import { serializeCsv } from './csv/serialize'
 import { FileFormat, Table } from './model/table'
+import { writeXlsx } from './xlsx/write'
 
 export interface CsvDocument {
   name: string
@@ -68,6 +69,12 @@ export function copyName(name: string, taken: string[]): string {
   }
 }
 
+/** The name an export of `name` is offered with: "report.csv" gives "report.xlsx". */
+export function xlsxName(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return `${dot > 0 ? name.slice(0, dot) : name}.xlsx`
+}
+
 /**
  * A new empty document that lives only in memory: it has no file handle, so nothing reaches the
  * disk until the user saves it (Save asks where, as Save As does).
@@ -113,6 +120,12 @@ export function serializeDocument(doc: CsvDocument): string {
   if (headers.length === 0) return ''
   const quotedHeaders = keep.map((c) => doc.quotedHeaders.has(doc.table.colIds[c]!))
   return serializeCsv(headers, rows, { delimiter, lineEnding, trailingNewline, quoteAll, quotedHeaders })
+}
+
+/** The document as an xlsx file. What goes in is what a save writes; the document itself does not change. */
+export function exportDocument(doc: CsvDocument): Promise<Blob> {
+  const { headers, rows } = contentToWrite(doc.table)
+  return writeXlsx(headers, rows)
 }
 
 export interface Encoded {

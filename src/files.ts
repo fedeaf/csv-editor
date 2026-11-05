@@ -1,7 +1,10 @@
-import { loadDocument, type CsvDocument } from './document'
+import { loadDocument, xlsxName, type CsvDocument } from './document'
 
 const CSV_TYPES: FilePickerAcceptType[] = [
   { description: 'CSV and text files', accept: { 'text/csv': ['.csv'], 'text/tab-separated-values': ['.tsv'], 'text/plain': ['.txt'] } },
+]
+const XLSX_TYPES: FilePickerAcceptType[] = [
+  { description: 'xlsx files', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } },
 ]
 const OPENABLE = /\.(csv|tsv|txt)$/i
 
@@ -68,7 +71,7 @@ export async function readDropped(data: DataTransfer): Promise<{ docs: CsvDocume
   return { docs, errors }
 }
 
-async function write(handle: FileSystemFileHandle, bytes: Uint8Array): Promise<void> {
+async function write(handle: FileSystemFileHandle, bytes: Uint8Array | Blob): Promise<void> {
   if ((await handle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
     if ((await handle.requestPermission({ mode: 'readwrite' })) !== 'granted') throw new Error('Write permission denied.')
   }
@@ -82,6 +85,23 @@ export async function saveCsv(doc: CsvDocument, bytes: Uint8Array): Promise<bool
   if (!doc.handle) return saveCsvAs(doc, bytes)
   await write(doc.handle, bytes)
   return true
+}
+
+/**
+ * Writes a copy to a file the user chooses, and returns its name; undefined if the user cancelled. The document keeps
+ * its own file and name. `content` runs once the file is chosen: the window needs a recent click to open, and making
+ * the content of a large table could outlast it.
+ */
+export async function exportXlsx(doc: CsvDocument, content: () => Promise<Blob>): Promise<string | undefined> {
+  let handle: FileSystemFileHandle
+  try {
+    handle = await window.showSaveFilePicker({ suggestedName: xlsxName(doc.name), types: XLSX_TYPES, startIn: doc.handle ?? doc.saveNextTo })
+  } catch (e) {
+    if (isAbort(e)) return undefined
+    throw e
+  }
+  await write(handle, await content())
+  return handle.name
 }
 
 export async function saveCsvAs(doc: CsvDocument, bytes: Uint8Array): Promise<boolean> {
